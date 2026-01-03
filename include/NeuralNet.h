@@ -8,8 +8,10 @@ void print_hello();
 
 typedef float Scalar;
 typedef Eigen::MatrixXf Matrix;
+typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> NPMatrix;
 typedef Eigen::RowVectorXf RowVector;
 typedef Eigen::VectorXf ColVector;
+
 
 // neural network implementation class!
 class NeuralNetwork {
@@ -19,13 +21,13 @@ public:
                 Scalar learningRate = Scalar(0.005));
 
   // function for forward propagation of data
-  void propagateForward(RowVector &input);
+  void propagateForward(Eigen::Ref<RowVector> input);
 
   // function for backward propagation of errors made by neurons
-  void propagateBackward(RowVector &output);
+  void propagateBackward(Eigen::Ref<RowVector> output);
 
   // function to calculate errors made by neurons in each layer
-  void calcErrors(RowVector &output);
+  void calcErrors(Eigen::Ref<RowVector> output);
 
   // function to update the weights of connections
   void updateWeights();
@@ -33,8 +35,9 @@ public:
   // function to train the neural network give an array of data points
   // void train(std::vector<RowVector*> data);
   Scalar train(std::vector<RowVector *> input_data,
-             std::vector<RowVector *> output_data);
-
+               std::vector<RowVector *> output_data);
+  // better training function
+  Scalar trainMat(Eigen::Ref<const NPMatrix> input_data, Eigen::Ref<const NPMatrix> output_data);
   // storage objects for working of neural network
   /*
         use pointers when using std::vector<Class> as std::vector<Class>
