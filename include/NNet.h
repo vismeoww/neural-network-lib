@@ -1,59 +1,13 @@
-#include "Mat.h"
-#include <cstddef>
-#include <cstdlib>
-#include <string>
+#pragma once
 
-enum Operation {
-  __BINARY_OPERATIONS__ = 0,
-  ADD,
-  SUB,
-  MUL,
-  __UNARY_OPERATIONS__,
-  RELU,
-  SIGMOID,
-  SOFTMAX
-};
-
-typedef struct Node {
-  bool isbase;
-  Operation op;
-  std::string name;
-  Matrix *data;
-
-  // if it's a unary operation then we do it on the lhs
-  // and rhs remains as nullptr
-  Node *lhs;
-  Node *rhs;
-
-  // functions
-  Node(Operation op, Node *lhs, Node *rhs);
-  Node(Operation op, Node *lhs);
-  Node(size_t rows, size_t cols);
-  // named 
-  Node(std::string name, Operation op, Node *lhs, Node *rhs): Node(op, lhs, rhs) {
-    this->name = name;
-  };
-  Node(std::string name, Operation op, Node *lhs): Node(op, lhs) {
-    this->name = name;
-  };
-  Node(std::string name, size_t rows, size_t cols): Node(rows, cols) {
-    this->name = name;
-  };
-  ~Node();
-  void print();
-  void performCompute();
-  size_t operandCount();
-  size_t recNodeCount();
-} Node;
-
-// void freeNode(Node* node);
-// size_t operandCount(Node* node);
-// void performCompute(Node* node);
+#include "Node.h"
+#include <vector>
 
 class ComputeGraph {
 private:
   Node *result;
   Node *input;
+  std::vector<Node*> nodes;
 
 public:
   ComputeGraph();
@@ -62,6 +16,10 @@ public:
   bool setInput(Node *node);
   const Node *getResult() const;
   bool compute();
+  // create nodes 
+  Node* createInputNode(size_t n);
+  Node* addLayer(Node* prev, size_t layer_size, Operation op);
   // debugging
+  void printAst();
   void printRes();
 };

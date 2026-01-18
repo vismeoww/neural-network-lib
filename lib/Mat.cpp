@@ -118,6 +118,23 @@ bool Matrix::relu(const Matrix &input) {
   return true;
 }
 
+bool Matrix::loss(double &result, const Matrix &expected) {
+  if (this->Rows != expected.Rows || this->Cols != expected.Cols) {
+    return false;
+  }
+  result = 0;
+  size_t n = 0;
+  for (int i = 0; i < this->Rows; i++) {
+    for (int j = 0; j < this->Cols; j++) {
+      n++;
+      result +=
+          ((*this)(i, j) - expected(i, j)) * ((*this)(i, j) - expected(i, j));
+    }
+  }
+  result /= n;
+  return true;
+}
+
 void Matrix::print() {
   for (int i = 0; i < Rows; i++) {
     for (int j = 0; j < Cols; j++) {

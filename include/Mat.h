@@ -22,6 +22,7 @@ class Matrix {
         bool softmax(const Matrix& input);
         bool sigmoid(const Matrix& input);
         bool relu(const Matrix& input);
+        bool loss(double& res, const Matrix& expected);
         // debug
         void print();
 
