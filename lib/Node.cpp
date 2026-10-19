@@ -4,10 +4,12 @@
 #include <string>
 
 size_t numOperandsFromOp(Operation op) {
-  if (op >= __BINARY_OPERATIONS__ && op < __UNARY_OPERATIONS__) {
+  if (op > __BINARY_OPERATIONS__ && op < __UNARY_OPERATIONS__) {
     return 2;
-  } else {
+  } else if (op > __UNARY_OPERATIONS__ && op < __NULLARY_OPERATIONS__) {
     return 1;
+  } else {
+    return 0;
   }
 }
 
@@ -25,6 +27,10 @@ std::string toString(Operation op) {
     return "SIGMOID";
   case SOFTMAX:
     return "SOFTMAX";
+  case WEIGHT:
+    return "WEIGHT";
+  case INPUT:
+    return "INPUT";
   default:
     return "UNKNOWN";
   }
@@ -76,33 +82,33 @@ Node::Node(Operation op, Node *lhs) {
   }
 }
 
-Node::Node(size_t rows, size_t cols) {
+Node::Node(size_t rows, size_t cols, bool is_input) {
   this->isbase = true;
+  if (is_input) {
+    this->op = INPUT;
+  } else {
+    this->op = WEIGHT;
+  }
   this->data = new Matrix(rows, cols);
   this->lhs = nullptr;
   this->rhs = nullptr;
 }
 
 Node::~Node() {
-    delete this->data;
-    if (this->lhs != nullptr){
-      delete this->lhs;
-      this->lhs = nullptr;
-    }
+  delete this->data;
+  if (this->lhs != nullptr) {
+    delete this->lhs;
+    this->lhs = nullptr;
+  }
 
-    if (this->rhs != nullptr)
-    {
-      delete this->rhs;
-      this->rhs = nullptr;
-    }
+  if (this->rhs != nullptr) {
+    delete this->rhs;
+    this->rhs = nullptr;
+  }
 }
 
 void Node::print() {
-  if (this->isbase) {
-    this->data->print();
-  } else {
-    std::cout << "Operation: " << this->op << std::endl;
-  }
+  std::cout << "Operation: " << toString(this->op) << std::endl;
 }
 
 size_t Node::operandCount() {

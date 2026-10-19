@@ -16,6 +16,9 @@ int main() {
     graph.compute();
     graph.printRes();
     graph.printAst();
+    // sort
+    graph.sort();
+    graph.printSortedList();
     
     return 0; 
 }

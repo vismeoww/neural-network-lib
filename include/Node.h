@@ -11,10 +11,14 @@ enum Operation {
   __UNARY_OPERATIONS__,
   RELU,
   SIGMOID,
-  SOFTMAX
+  SOFTMAX,
+  __NULLARY_OPERATIONS__,
+  WEIGHT,
+  INPUT,
 };
 
 size_t numOperandsFromOp(Operation op);
+std::string toString(Operation op);
 
 typedef struct Node {
   bool isbase;
@@ -30,7 +34,7 @@ typedef struct Node {
   // functions
   Node(Operation op, Node *lhs, Node *rhs);
   Node(Operation op, Node *lhs);
-  Node(size_t rows, size_t cols);
+  Node(size_t rows, size_t cols, bool is_input);
   // named
   Node(std::string name, Operation op, Node *lhs, Node *rhs)
       : Node(op, lhs, rhs) {
@@ -39,7 +43,7 @@ typedef struct Node {
   Node(std::string name, Operation op, Node *lhs) : Node(op, lhs) {
     this->name = name;
   };
-  Node(std::string name, size_t rows, size_t cols) : Node(rows, cols) {
+  Node(std::string name, size_t rows, size_t cols, bool is_input) : Node(rows, cols, is_input) {
     this->name = name;
   };
   ~Node();

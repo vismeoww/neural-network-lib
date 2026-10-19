@@ -8,6 +8,9 @@ private:
   Node *result;
   Node *input;
   std::vector<Node*> nodes;
+  // topological sort 
+  bool sorted = false;
+  std::vector<Node*> sorted_nodes;
 
 public:
   ComputeGraph();
@@ -19,7 +22,10 @@ public:
   // create nodes 
   Node* createInputNode(size_t n);
   Node* addLayer(Node* prev, size_t layer_size, Operation op);
+  // topological sort 
+  void sort();
   // debugging
   void printAst();
   void printRes();
+  void printSortedList();
 };
