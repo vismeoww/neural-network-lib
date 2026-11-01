@@ -11,4 +11,4 @@ set(PROJECT_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(lib)
 add_subdirectory(app)
 # we will deal with this later
-# add_subdirectory(pywrap)
+add_subdirectory(pywrap)

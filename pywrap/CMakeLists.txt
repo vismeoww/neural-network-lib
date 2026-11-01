@@ -14,7 +14,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 
 # 3. Create the module
-pybind11_add_module(pynn wrapper.cpp)
+pybind11_add_module(pynn bindings.cpp)
 
 # 4. Link to your core C++ library from the /src directory
 target_link_libraries(pynn PRIVATE NNLib)
@@ -22,5 +22,8 @@ target_link_libraries(pynn PRIVATE NNLib)
 # 5. Move the finished .so/.pyd file into pywrap for easy access
 set_target_properties(pynn PROPERTIES 
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RUNTIME_OUTOUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    PREFIX ""
+    SUFFIX ".abi3.so"
 )
 set_target_properties(pynn PROPERTIES PREFIX "")
