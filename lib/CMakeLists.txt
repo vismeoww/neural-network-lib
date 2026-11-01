@@ -1,9 +1,7 @@
 
 add_library(NNLib 
-    Mat.cpp 
-    Node.cpp
-    NNet.cpp
     Tensor.cpp
+    Graph.cpp
 )
 set_property(TARGET NNLib PROPERTY POSITION_INDEPENDENT_CODE ON)
 
