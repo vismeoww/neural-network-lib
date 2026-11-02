@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "hellonn"
 version = "0.1.0"
 description = "HelloNN Python bindings"
-dependencies = []
+dependencies = ["numpy", "matplotlib"]
 
 [tool.setuptools.packages.find]
 where = ["."]
