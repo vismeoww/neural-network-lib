@@ -1,17 +1,13 @@
 # HelloNN
+My experiments on building a neural network library from scratch
 
-A simple C++ project using CMake.
-
-## Structure
-
-*   `app/`: Contains the executable code.
-*   `lib/`: Contains the library code.
-*   `include/`: Contains the library header files.
 
 ## Build
 ### CXX project
 ```bash
-cmake -B build -S .
+cmake -B build -S . \
+    -DLLVM_DIR=/path/to/llvm-project/build/lib/cmake/llvm \
+    -DMLIR_DIR=/path/to/llvm-project/build/lib/cmake/mlir \
 cmake --build .
 ```
 ### Python project
@@ -28,5 +24,5 @@ pip install -e .
 ```
 ### python project
 ```bash
-./pywrap/example.py
+python pywrap/example/ex2.py
 ```

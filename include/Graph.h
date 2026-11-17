@@ -15,40 +15,38 @@
 #include "Tensor.h"
 #include "Operator.h"
 
-using NodeId = int;
-enum class Init { Zero, He, Xavier };
+#include "BaseGraph.hpp"
 
-struct Node {
-  std::unique_ptr<Op> op; // null for leaves (inputs / params)
-  std::vector<NodeId> inputs;
-  Tensor value, grad;
-  bool requiresGrad = false;
-  bool isParam = false;
-  std::string label;
-};
+// using NodeId = int;
+// enum class Init { Zero, He, Xavier };
 
-class Graph {
-  std::vector<Node> nodes_;
-  std::mt19937 rng_;
+// struct Node {
+//   std::unique_ptr<Op> op; // null for leaves (inputs / params)
+//   std::vector<NodeId> inputs;
+//   Tensor value, grad;
+//   bool requiresGrad = false;
+//   bool isParam = false;
+//   std::string label;
+// };
 
+class CPUGraph : public Graph {
   void initParam(Tensor &t, Init init);
 
 public:
-  explicit Graph(unsigned seed = 42) : rng_(seed) {}
-  std::mt19937 &rng() { return rng_; }
+  explicit CPUGraph(unsigned seed = 42) : Graph(seed) {}
 
   // Data / label leaf. No gradient.
-  NodeId input(Shape s, std::string label = "");
+  // NodeId input(Shape s, std::string label = "");
 
   // Trainable leaf.
-  NodeId param(Shape s, Init init, std::string label = "");
+  NodeId param(Shape s, Init init, std::string label = "") override;
 
-  NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in); 
+  NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in) override; 
 
-  Tensor &value(NodeId id) { return nodes_[id].value; }
-  Tensor &grad(NodeId id) { return nodes_[id].grad; }
-  Shape shape(NodeId id) const { return nodes_[id].value.s; }
-  size_t numNodes() const { return nodes_.size(); }
+  // Tensor &value(NodeId id) { return nodes_[id].value; }
+  // Tensor &grad(NodeId id) { return nodes_[id].grad; }
+  // Shape shape(NodeId id) const { return nodes_[id].value.s; }
+  // size_t numNodes() const { return nodes_.size(); }
 
   void forward(); 
 
@@ -69,11 +67,11 @@ public:
 // Layer helpers
 // ============================================================================
 
-NodeId linear(Graph &g, NodeId x, size_t out, Init init = Init::He); 
-NodeId relu(Graph &g, NodeId x); 
-NodeId sigmoid(Graph &g, NodeId x); 
-NodeId tanh_(Graph &g, NodeId x); 
-NodeId mseLoss(Graph &g, NodeId pred, NodeId target); 
+NodeId linear(CPUGraph &g, NodeId x, size_t out, Init init = Init::He); 
+NodeId relu(CPUGraph &g, NodeId x); 
+NodeId sigmoid(CPUGraph &g, NodeId x); 
+NodeId tanh_(CPUGraph &g, NodeId x); 
+NodeId mseLoss(CPUGraph &g, NodeId pred, NodeId target); 
 
 // ============================================================================
 // Optimizers

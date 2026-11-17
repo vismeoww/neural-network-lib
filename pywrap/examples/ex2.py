@@ -12,7 +12,7 @@ x_np = np.linspace(-2.0, 2.0, N).reshape(N, 1).astype(np.float32)
 y_np = (0.5 * (x_np ** 3) - 1.5 * x_np + 0.5).astype(np.float32)
 
 # 2. Initialize Graph and Architecture
-g = pynn.Graph(seed=42)
+g = pynn.CPUGraph(seed=42)
 
 # Define inputs with shape [N, 1]
 x_id = g.input(pynn.Shape(N, 1), label="x")

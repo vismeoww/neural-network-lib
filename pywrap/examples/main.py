@@ -2,7 +2,7 @@ import pywrap.pynn as pynn
 import numpy as np
 
 # 1. Initialize Graph and define architecture
-g = pynn.Graph(seed=42)
+g = pynn.CPUGraph(seed=42)
 
 # Input placeholder (e.g., batch_size=32, input_dim=10)
 x_id = g.input(pynn.Shape(32, 10), label="features")

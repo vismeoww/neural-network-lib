@@ -7,7 +7,7 @@
 #include "Operator.h"
 
 class PGraph {
-    Graph g;
+    CPUGraph g;
     public:
     PGraph(unsigned int seed = 42): g(42) {}
 };
@@ -80,25 +80,25 @@ PYBIND11_MODULE(pynn, m) {
     // =========================================================================
     // 4. Bind Graph Class
     // =========================================================================
-    py::class_<Graph>(m, "Graph")
+    py::class_<CPUGraph>(m, "CPUGraph")
         .def(py::init<unsigned>(), py::arg("seed") = 42)
-        .def("input", &Graph::input, py::arg("s"), py::arg("label") = "",
+        .def("input", &CPUGraph::input, py::arg("s"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
-        .def("param", &Graph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
+        .def("param", &CPUGraph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
-        .def("forward", &Graph::forward)
-        .def("backward", &Graph::backward, py::arg("loss"))
-        .def("set_input_shape", &Graph::setInputShape)
-        .def("reshape", &Graph::reshape)
-        .def("num_nodes", &Graph::numNodes)
-        .def("print", &Graph::print)
-        .def("value", [](Graph &g, size_t id) -> Tensor& {
+        .def("forward", &CPUGraph::forward)
+        .def("backward", &CPUGraph::backward, py::arg("loss"))
+        .def("set_input_shape", &CPUGraph::setInputShape)
+        .def("reshape", &CPUGraph::reshape)
+        .def("num_nodes", &CPUGraph::numNodes)
+        .def("print", &CPUGraph::print)
+        .def("value", [](CPUGraph &g, size_t id) -> Tensor& {
             return g.value(id);
         }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("grad", [](Graph &g, size_t id) -> Tensor& {
+        .def("grad", [](CPUGraph &g, size_t id) -> Tensor& {
             return g.grad(id);
         }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("param_pairs", &Graph::paramPairs, py::return_value_policy::reference_internal);
+        .def("param_pairs", &CPUGraph::paramPairs, py::return_value_policy::reference_internal);
 
     // =========================================================================
     // 5. Bind Layer Helpers
