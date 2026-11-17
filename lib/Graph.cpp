@@ -135,22 +135,22 @@ void CPUGraph::print() const {
 }
 
 
-NodeId linear(CPUGraph &g, NodeId x, size_t out, Init init) {
+NodeId linear(Graph &g, NodeId x, size_t out, Init init) {
   const size_t in = g.shape(x).c;
   NodeId W = g.param({in, out}, init, "W");
   NodeId b = g.param({1, out}, Init::Zero, "b");
   NodeId xw = g.apply(std::make_unique<MatMul>(), {x, W});
   return g.apply(std::make_unique<AddBias>(), {xw, b});
 }
-NodeId relu(CPUGraph &g, NodeId x) {
+NodeId relu(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Relu>(), {x});
 }
-NodeId sigmoid(CPUGraph &g, NodeId x) {
+NodeId sigmoid(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Sigmoid>(), {x});
 }
-NodeId tanh_(CPUGraph &g, NodeId x) {
+NodeId tanh_(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Tanh>(), {x});
 }
-NodeId mseLoss(CPUGraph &g, NodeId pred, NodeId target) {
+NodeId mseLoss(Graph &g, NodeId pred, NodeId target) {
   return g.apply(std::make_unique<MSELoss>(), {pred, target});
 }

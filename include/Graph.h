@@ -67,11 +67,11 @@ public:
 // Layer helpers
 // ============================================================================
 
-NodeId linear(CPUGraph &g, NodeId x, size_t out, Init init = Init::He); 
-NodeId relu(CPUGraph &g, NodeId x); 
-NodeId sigmoid(CPUGraph &g, NodeId x); 
-NodeId tanh_(CPUGraph &g, NodeId x); 
-NodeId mseLoss(CPUGraph &g, NodeId pred, NodeId target); 
+NodeId linear(Graph &g, NodeId x, size_t out, Init init = Init::He); 
+NodeId relu(Graph &g, NodeId x); 
+NodeId sigmoid(Graph &g, NodeId x); 
+NodeId tanh_(Graph &g, NodeId x); 
+NodeId mseLoss(Graph &g, NodeId pred, NodeId target); 
 
 // ============================================================================
 // Optimizers

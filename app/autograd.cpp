@@ -92,7 +92,7 @@ static void runGradChecks() {
 
   struct Case {
     const char *name;
-    NodeId (*act)(CPUGraph &, NodeId);
+    NodeId (*act)(Graph &, NodeId);
   } cases[] = {{"tanh", tanh_}, {"sigmoid", sigmoid}, {"relu", relu}};
 
   for (auto &c : cases) {

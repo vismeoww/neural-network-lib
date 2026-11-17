@@ -77,10 +77,22 @@ PYBIND11_MODULE(pynn, m) {
             t.v.assign(ptr, ptr + arr.size());
         });
 
+    // Bind the abstract/base Graph class first
+    py::class_<Graph>(m, "Graph")
+        .def("input", &Graph::input, py::arg("s"), py::arg("label") = "",
+             py::return_value_policy::reference_internal)
+        .def("num_nodes", &Graph::numNodes)
+        .def("value", [](Graph &g, size_t id) -> Tensor& {
+            return g.value(id);
+        }, py::return_value_policy::reference_internal, py::arg("id"))
+        .def("grad", [](Graph &g, size_t id) -> Tensor& {
+            return g.grad(id);
+    }, py::return_value_policy::reference_internal, py::arg("id"));
+
     // =========================================================================
     // 4. Bind Graph Class
     // =========================================================================
-    py::class_<CPUGraph>(m, "CPUGraph")
+    py::class_<CPUGraph, Graph>(m, "CPUGraph")
         .def(py::init<unsigned>(), py::arg("seed") = 42)
         .def("input", &CPUGraph::input, py::arg("s"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
