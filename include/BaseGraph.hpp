@@ -1,3 +1,4 @@
+#pragma once
 #include "Tensor.h"
 #include "Operator.h"
 
@@ -54,5 +55,5 @@ public:
 
   virtual std::vector<std::pair<Tensor *, Tensor *>> paramPairs() = 0; 
 
-  virtual void print() const = 0; 
+  virtual void print() = 0; 
 };

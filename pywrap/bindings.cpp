@@ -3,6 +3,7 @@
 #include <pybind11/numpy.h>
 
 #include "Graph.h"
+#include "MLIRGraph.hpp"
 #include "Tensor.h"
 #include "Operator.h"
 
@@ -129,4 +130,25 @@ PYBIND11_MODULE(pynn, m) {
     py::class_<SGD, Optimizer>(m, "SGD")
         .def(py::init<Scalar, Scalar>(), py::arg("lr"), py::arg("momentum") = 0.0)
         .def("step", &SGD::step);
+
+    // MLIR Graph
+    py::class_<MLIRGraph, Graph>(m, "MLIRGraph")
+        .def(py::init<unsigned>(), py::arg("seed") = 42)
+        .def("input", &MLIRGraph::input, py::arg("s"), py::arg("label") = "",
+             py::return_value_policy::reference_internal)
+        .def("param", &MLIRGraph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
+             py::return_value_policy::reference_internal)
+        .def("forward", &MLIRGraph::forward)
+        .def("backward", &MLIRGraph::backward, py::arg("loss"))
+        .def("set_input_shape", &MLIRGraph::setInputShape)
+        .def("reshape", &MLIRGraph::reshape)
+        .def("num_nodes", &MLIRGraph::numNodes)
+        .def("print", &MLIRGraph::print)
+        .def("value", [](MLIRGraph &g, size_t id) -> Tensor& {
+            return g.value(id);
+        }, py::return_value_policy::reference_internal, py::arg("id"))
+        .def("grad", [](MLIRGraph &g, size_t id) -> Tensor& {
+            return g.grad(id);
+        }, py::return_value_policy::reference_internal, py::arg("id"))
+        .def("param_pairs", &MLIRGraph::paramPairs, py::return_value_policy::reference_internal);
 }

@@ -121,7 +121,7 @@ std::vector<std::pair<Tensor *, Tensor *>> CPUGraph::paramPairs() {
 }
 
 
-void CPUGraph::print() const {
+void CPUGraph::print() {
     for (size_t i = 0; i < nodes_.size(); i++) {
       const Node &n = nodes_[i];
       std::printf("%3zu  %-10s %zux%zu  %s", i, n.label.c_str(), n.value.s.r,

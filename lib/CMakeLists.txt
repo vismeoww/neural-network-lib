@@ -2,6 +2,7 @@
 add_library(NNLib 
     Tensor.cpp
     Graph.cpp
+    MLIRGraph.cpp
 )
 set_property(TARGET NNLib PROPERTY POSITION_INDEPENDENT_CODE ON)
 

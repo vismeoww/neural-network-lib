@@ -60,7 +60,7 @@ public:
 
   std::vector<std::pair<Tensor *, Tensor *>> paramPairs(); 
 
-  void print() const; 
+  void print(); 
 };
 
 // ============================================================================
