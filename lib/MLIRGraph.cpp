@@ -3,6 +3,11 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <llvm/Support/raw_ostream.h>
 
+
+void MLIRGraph::initParam(Tensor &t, Init init){
+    assert(0&&"not implemented");
+}
+
 MLIRGraph::MLIRGraph(unsigned int seed) 
     : Graph(seed), builder_(&context_) {
     // Register all upstream dialects
@@ -55,6 +60,30 @@ NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     
     nodes_.push_back(std::move(node));
     return nodes_.size() - 1;
+}
+
+void MLIRGraph::forward(){
+    assert(0&&"not implemented");
+}
+
+void MLIRGraph::backward(NodeId loss){
+    assert(0&&"not implemented");
+}
+
+void MLIRGraph::setInputShape(NodeId i, Shape s){
+    assert(0&&"not implemented");
+}
+
+void MLIRGraph::reshape() {
+    assert(0&&"not implemented");
+}
+
+
+std::vector<std::pair<Tensor *, Tensor *>> MLIRGraph::paramPairs() {
+    std::vector<std::pair<Tensor *, Tensor *>> p;
+    for (Node &n : nodes_)
+      if (n.isParam) p.emplace_back(&n.value, &n.grad);
+    return p;
 }
 
 void MLIRGraph::print() {
