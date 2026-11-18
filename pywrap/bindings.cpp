@@ -7,11 +7,6 @@
 #include "Tensor.h"
 #include "Operator.h"
 
-class PGraph {
-    CPUGraph g;
-    public:
-    PGraph(unsigned int seed = 42): g(42) {}
-};
 
 int add(int i, int j) {
     return i + j;

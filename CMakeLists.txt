@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(HelloNN CXX)
+project(HelloNN CXX C)
 
 # set create compile commands database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
