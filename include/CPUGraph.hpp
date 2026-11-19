@@ -15,7 +15,7 @@
 #include "Tensor.h"
 #include "Operator.h"
 
-#include "BaseGraph.hpp"
+#include "Graph.hpp"
 
 // using NodeId = int;
 // enum class Init { Zero, He, Xavier };

@@ -2,7 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
-#include "Graph.h"
+#include "CPUGraph.hpp"
 #include "MLIRGraph.hpp"
 #include "Tensor.h"
 #include "Operator.h"

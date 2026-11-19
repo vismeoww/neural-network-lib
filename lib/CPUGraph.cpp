@@ -1,4 +1,4 @@
-#include "Graph.h"
+#include "CPUGraph.hpp"
 
 
 void CPUGraph::initParam(Tensor &t, Init init) {

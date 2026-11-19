@@ -21,7 +21,7 @@ protected:
 
 public:
   explicit Graph(unsigned int seed  = 42): rng_(seed) {}
-  ~Graph() = default;
+  virtual ~Graph() = default;
   std::mt19937 &rng() { return rng_; }
 
   // Data / label leaf. No gradient.

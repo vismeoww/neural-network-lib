@@ -9,3 +9,4 @@ Makefile
 *.pyc
 __pycache__/
 hellonn.egg-info/
+.vscode/*

@@ -17,8 +17,15 @@ MLIRGraph::MLIRGraph(unsigned int seed)
     context_.loadAllAvailableDialects();
 
     // Create the top-level MLIR module
-    mlir::OwningOpRef<mlir::ModuleOp> module_ = mlir::ModuleOp::create(builder_.getUnknownLoc());
-    builder_.setInsertionPointToStart(module_->getBody());
+    module_ = mlir::ModuleOp::create(builder_.getUnknownLoc());
+    // builder_.setInsertionPointToStart(module_.getBody());
+
+    // In MLIRGraph constructor (after creating module_):
+    auto loc = builder_.getUnknownLoc();
+    auto funcType = builder_.getFunctionType({}, {}); // signature updated later
+    fwdFunc_ = mlir::func::FuncOp::create(builder_, loc, "forward", funcType);
+    mlir::Block *entryBlock = fwdFunc_.addEntryBlock();
+    builder_.setInsertionPointToStart(entryBlock);
 }
 
 NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
@@ -35,31 +42,68 @@ NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
     return nodes_.size() - 1;
 }
 
+mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
+    if (auto it = mlirValues_.find(id); it != mlirValues_.end()) {
+        return it->second;
+    }
+
+    // Leaf node (input or param) not yet in MLIR -> append as a func block argument
+    Shape s = nodes_[id].value.s;
+    auto tensorType = mlir::RankedTensorType::get(
+        {static_cast<int64_t>(s.r), static_cast<int64_t>(s.c)},
+        builder_.getF32Type()
+    );
+
+    mlir::Block &entry = fwdFunc_.getBody().front();
+    mlir::Value arg = entry.addArgument(tensorType, builder_.getUnknownLoc());
+    mlirValues_[id] = arg;
+    inputArgNodes_.push_back(id); // track arg order for ExecutionEngine later
+    return arg;
+}
+
 NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     Node node;
     node.op = std::move(op);
     node.inputs = std::vector<NodeId>{in.begin(), in.end()};
-    
-    // Infer output shape based on operator type and input tensors
-    Shape outShape = node.op->outShape(
-        std::vector<Shape>{nodes_[in[0]].value.s, nodes_[in[1]].value.s}
-    );
+   
+    std::vector<Shape> inShapes;
+    inShapes.reserve(in.size());
+    for(auto i : in) inShapes.push_back(nodes_[i].value.s);
+    Shape outShape = node.op->outShape(inShapes);
     node.value.resize(outShape);
     node.grad.resize(outShape);
-    
-    // Emit linalg/tensor operations in MLIR
+
+    // 2. Gather MLIR SSA values for all inputs
+    llvm::SmallVector<mlir::Value, 4> mlirInputs;
+    for (NodeId id : node.inputs) {
+        mlirInputs.push_back(getOrAddValue(id));
+    }
+
+    // 3. Emit the op (using Option A dispatch table; for Option B use node.op->emitMLIR)
     auto loc = builder_.getUnknownLoc();
-    auto tensorType = mlir::RankedTensorType::get(
-        {static_cast<int64_t>(outShape.r), static_cast<int64_t>(outShape.c)},
-        builder_.getF32Type()
-    );
-    
-    // TODO: Depending on node.op->name(), emit the specific linalg op:
-    // e.g., if matrix multiplication, emit linalg::MatmulOp
-    // if element-wise activation (ReLU, Sigmoid), emit linalg::GenericOp
-    
+    // auto it = emitters_.find(node.op->name());
+    // assert(it != emitters_.end() && "Unsupported MLIR op");
+    // mlir::Value result = it->second(builder_, loc, mlirInputs);
+    mlir::Value result = node.op->emitMLIR(builder_,loc,mlirInputs);
+
+    // 4. Register the node and its MLIR value
+    NodeId outId = static_cast<NodeId>(nodes_.size());
+    mlirValues_[outId] = result;
     nodes_.push_back(std::move(node));
-    return nodes_.size() - 1;
+    return outId;
+}
+
+void MLIRGraph::finalizeForward(NodeId outputNode) {
+    auto loc = builder_.getUnknownLoc();
+    mlir::Value outVal = mlirValues_.at(outputNode);
+
+    // 1. Emit func.return
+    mlir::func::ReturnOp::create(builder_, loc, outVal);
+
+    // 2. Sync the FunctionType with the entry block's actual argument types
+    mlir::Block &entry = fwdFunc_.getBody().front();
+    auto newType = builder_.getFunctionType(entry.getArgumentTypes(), {outVal.getType()});
+    fwdFunc_.setFunctionType(newType);
 }
 
 void MLIRGraph::forward(){

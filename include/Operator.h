@@ -19,6 +19,14 @@
 
 
 // ============================================================================
+// MLIR 
+// ============================================================================
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "MLIROp.hpp"
+
+// ============================================================================
 // Op interface
 // ============================================================================
 
@@ -32,6 +40,7 @@ struct Op {
   virtual void backward(const std::vector<const Tensor *> &in,
                         const Tensor &out, const Tensor &gradOut,
                         const std::vector<Tensor *> &gradIn) = 0;
+  virtual mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -52,6 +61,9 @@ struct MatMul : Op {
                 const std::vector<Tensor *> &gin) override {
     if (gin[0]) gemm(G, false, *in[1], true, *gin[0], true); // dX += G * W^T
     if (gin[1]) gemm(*in[0], true, G, false, *gin[1], true); // dW += X^T * G
+  }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    return emitMatmul(b,loc,inputs[0],inputs[1]);
   }
 };
 
@@ -79,6 +91,9 @@ struct AddBias : Op {
       for (size_t i = 0; i < G.s.r; i++)
         for (size_t j = 0; j < G.s.c; j++) (*gin[1])(0, j) += G(i, j);
   }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    return emitAddBias(b,loc,inputs[0],inputs[1]);
+  }
 };
 
 // ----------------------------------------------------------------------------
@@ -98,6 +113,9 @@ struct Relu : Op {
     for (size_t k = 0; k < G.v.size(); k++)
       if (in[0]->v[k] > 0) gin[0]->v[k] += G.v[k];
   }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    return emitRelu(b,loc,inputs[0]);
+  }
 };
 
 struct Sigmoid : Op {
@@ -114,6 +132,9 @@ struct Sigmoid : Op {
     for (size_t k = 0; k < G.v.size(); k++)
       gin[0]->v[k] += G.v[k] * out.v[k] * (1.0 - out.v[k]);
   }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    assert(0&&"not implemented");
+  }
 };
 
 struct Tanh : Op {
@@ -128,6 +149,9 @@ struct Tanh : Op {
     if (!gin[0]) return;
     for (size_t k = 0; k < G.v.size(); k++)
       gin[0]->v[k] += G.v[k] * (1.0 - out.v[k] * out.v[k]);
+  }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    assert(0&&"not implemented");
   }
 };
 
@@ -160,5 +184,8 @@ struct MSELoss : Op {
       if (gin[0]) gin[0]->v[k] += d;
       if (gin[1]) gin[1]->v[k] -= d;
     }
+  }
+  mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
+    assert(0&&"not implemented");
   }
 };
