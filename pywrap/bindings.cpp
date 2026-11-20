@@ -133,6 +133,7 @@ PYBIND11_MODULE(pynn, m) {
              py::return_value_policy::reference_internal)
         .def("param", &MLIRGraph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
+        .def("finalizeForward", &MLIRGraph::finalizeForward, py::arg("outputNode"))
         .def("forward", &MLIRGraph::forward)
         .def("backward", &MLIRGraph::backward, py::arg("loss"))
         .def("set_input_shape", &MLIRGraph::setInputShape)

@@ -5,7 +5,10 @@
 
 
 void MLIRGraph::initParam(Tensor &t, Init init){
-    assert(0&&"not implemented");
+    // assert(0&&"not implemented");
+    // Zero-initialize for now (adjust to your Tensor's underlying storage, e.g., t.data)
+    std::fill(t.v.begin(), t.v.end(), 0.0f);
+    (void)init; // silence unused parameter warning until He/Xavier are added
 }
 
 MLIRGraph::MLIRGraph(unsigned int seed) 
@@ -18,7 +21,7 @@ MLIRGraph::MLIRGraph(unsigned int seed)
 
     // Create the top-level MLIR module
     module_ = mlir::ModuleOp::create(builder_.getUnknownLoc());
-    // builder_.setInsertionPointToStart(module_.getBody());
+    builder_.setInsertionPointToStart(module_.getBody());
 
     // In MLIRGraph constructor (after creating module_):
     auto loc = builder_.getUnknownLoc();
@@ -35,14 +38,30 @@ NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
     node.label = std::move(label);
     node.isParam = true;
     node.requiresGrad = true;
-    
-    initParam(node.value, init); // Your weight initialization logic
+
+    initParam(node.value, init);
+    // Also zero out grad so it doesn't hold garbage
+    std::fill(node.grad.v.begin(), node.grad.v.end(), 0.0f);
+
+    NodeId id = static_cast<NodeId>(nodes_.size());
     nodes_.push_back(std::move(node));
-    
-    return nodes_.size() - 1;
+
+    // Register the parameter as an MLIR function argument immediately
+    auto tensorType = mlir::RankedTensorType::get(
+        {static_cast<int64_t>(s.r), static_cast<int64_t>(s.c)},
+        builder_.getF32Type()
+    );
+
+    mlir::Block &entry = fwdFunc_.getBody().front();
+    mlir::Value arg = entry.addArgument(tensorType, builder_.getUnknownLoc());
+
+    mlirValues_[id] = arg;
+    inputArgNodes_.push_back(id);
+
+    return id;
 }
 
-mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
+mlir::Value MLIRGraph::getOrAddValue(NodeId id, mlir::Location loc) {
     if (auto it = mlirValues_.find(id); it != mlirValues_.end()) {
         return it->second;
     }
@@ -55,7 +74,7 @@ mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
     );
 
     mlir::Block &entry = fwdFunc_.getBody().front();
-    mlir::Value arg = entry.addArgument(tensorType, builder_.getUnknownLoc());
+    mlir::Value arg = entry.addArgument(tensorType, loc);
     mlirValues_[id] = arg;
     inputArgNodes_.push_back(id); // track arg order for ExecutionEngine later
     return arg;
@@ -76,7 +95,12 @@ NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     // 2. Gather MLIR SSA values for all inputs
     llvm::SmallVector<mlir::Value, 4> mlirInputs;
     for (NodeId id : node.inputs) {
-        mlirInputs.push_back(getOrAddValue(id));
+        // TODO: fix so that you see names instead of %arg0 
+        std::string argName(node.op->name());
+        mlir::Location argLoc = mlir::NameLoc::get(
+            builder_.getStringAttr(argName+std::to_string(id)), builder_.getUnknownLoc()
+        );
+        mlirInputs.push_back(getOrAddValue(id, argLoc));
     }
 
     // 3. Emit the op (using Option A dispatch table; for Option B use node.op->emitMLIR)

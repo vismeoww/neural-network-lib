@@ -23,7 +23,7 @@ public:
     // ~MLIRGraph() override = default;
 
     NodeId param(Shape s, Init init, std::string label = "") override;
-    mlir::Value getOrAddValue(NodeId id);
+    mlir::Value getOrAddValue(NodeId id, mlir::Location loc);
     NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in) override;
    
     void finalizeForward(NodeId outputNode);
