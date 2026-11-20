@@ -5,10 +5,13 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/SmallVector.h"
 
-mlir::Value emitMatmul(mlir::OpBuilder &builder, mlir::Location loc, 
-                       mlir::Value lhs, mlir::Value rhs); 
+mlir::Value emitMatmul(mlir::OpBuilder &builder, mlir::Location loc,
+                       mlir::Value lhs, mlir::Value rhs);
 
-mlir::Value emitAddBias(mlir::OpBuilder &builder, mlir::Location loc, 
-                        mlir::Value input, mlir::Value bias); 
+mlir::Value emitAddBias(mlir::OpBuilder &builder, mlir::Location loc,
+                        mlir::Value input, mlir::Value bias);
 
-mlir::Value emitRelu(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value input); 
+mlir::Value emitRelu(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value input);
+
+mlir::Value emitMSELoss(mlir::OpBuilder &builder, mlir::Location loc,
+                        mlir::Value pred, mlir::Value target);

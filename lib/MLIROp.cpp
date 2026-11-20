@@ -94,3 +94,57 @@ mlir::Value emitRelu(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value i
 
     return genericOp.getResult(0);
 }
+
+mlir::Value emitMSELoss(mlir::OpBuilder &builder, mlir::Location loc,
+                        mlir::Value pred, mlir::Value target) {
+    auto predType = mlir::cast<mlir::RankedTensorType>(pred.getType());
+    int64_t M = predType.getShape()[0];
+    int64_t N = predType.getShape()[1];
+    float invCount = 1.0f / static_cast<float>(M * N);
+
+    // Output is a [1, 1] tensor to match your 2D Shape{r, c} convention
+    auto outputType = mlir::RankedTensorType::get({1, 1}, builder.getF32Type());
+
+    // Zero-initialize the accumulator tensor before reducing into it
+    auto emptyTensor = mlir::tensor::EmptyOp::create(
+        builder, loc, llvm::ArrayRef<int64_t>{1, 1}, builder.getF32Type());
+    auto zero = mlir::arith::ConstantOp::create(
+        builder, loc, builder.getF32FloatAttr(0.0f));
+    auto zeroTensor = mlir::linalg::FillOp::create(
+        builder, loc, mlir::ValueRange{zero}, mlir::ValueRange{emptyTensor}).getResult(0);
+
+    auto d0 = builder.getAffineDimExpr(0);
+    auto d1 = builder.getAffineDimExpr(1);
+    auto c0 = builder.getAffineConstantExpr(0);
+
+    llvm::SmallVector<mlir::AffineMap, 3> indexingMaps = {
+        mlir::AffineMap::get(2, 0, {d0, d1}, builder.getContext()), // pred:   [M, N]
+        mlir::AffineMap::get(2, 0, {d0, d1}, builder.getContext()), // target: [M, N]
+        mlir::AffineMap::get(2, 0, {c0, c0}, builder.getContext())  // output: [1, 1]
+    };
+
+    llvm::SmallVector<mlir::utils::IteratorType, 2> iteratorTypes = {
+        mlir::utils::IteratorType::reduction,
+        mlir::utils::IteratorType::reduction
+    };
+
+    auto genericOp = mlir::linalg::GenericOp::create(
+        builder, loc,
+        outputType,
+        mlir::ValueRange{pred, target},
+        mlir::ValueRange{zeroTensor},
+        indexingMaps,
+        iteratorTypes,
+        [invCount](mlir::OpBuilder &b, mlir::Location l, mlir::ValueRange args) {
+            // args[0] = pred, args[1] = target, args[2] = accumulator
+            auto diff = mlir::arith::SubFOp::create(b, l, args[0], args[1]);
+            auto sq = mlir::arith::MulFOp::create(b, l, diff, diff);
+            auto scale = mlir::arith::ConstantOp::create(b, l, b.getF32FloatAttr(invCount));
+            auto scaled = mlir::arith::MulFOp::create(b, l, sq, scale);
+            auto acc = mlir::arith::AddFOp::create(b, l, args[2], scaled);
+            mlir::linalg::YieldOp::create(b, l, acc.getResult());
+        }
+    );
+
+    return genericOp.getResult(0);
+}

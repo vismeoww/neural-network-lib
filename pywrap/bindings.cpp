@@ -140,6 +140,7 @@ PYBIND11_MODULE(pynn, m) {
         .def("reshape", &MLIRGraph::reshape)
         .def("num_nodes", &MLIRGraph::numNodes)
         .def("print", &MLIRGraph::print)
+        .def("dump", &MLIRGraph::dump)
         .def("value", [](MLIRGraph &g, size_t id) -> Tensor& {
             return g.value(id);
         }, py::return_value_policy::reference_internal, py::arg("id"))

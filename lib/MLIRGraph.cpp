@@ -11,6 +11,12 @@ void MLIRGraph::initParam(Tensor &t, Init init){
     (void)init; // silence unused parameter warning until He/Xavier are added
 }
 
+mlir::Location MLIRGraph::makeNodeLoc(NodeId id) {
+    const std::string &label = nodes_[id].label;
+    std::string name = label.empty() ? ("node" + std::to_string(id)) : label;
+    return mlir::NameLoc::get(builder_.getStringAttr(name));
+}
+
 MLIRGraph::MLIRGraph(unsigned int seed) 
     : Graph(seed), builder_(&context_) {
     // Register all upstream dialects
@@ -53,7 +59,7 @@ NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
     );
 
     mlir::Block &entry = fwdFunc_.getBody().front();
-    mlir::Value arg = entry.addArgument(tensorType, builder_.getUnknownLoc());
+    mlir::Value arg = entry.addArgument(tensorType, makeNodeLoc(id));
 
     mlirValues_[id] = arg;
     inputArgNodes_.push_back(id);
@@ -61,7 +67,7 @@ NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
     return id;
 }
 
-mlir::Value MLIRGraph::getOrAddValue(NodeId id, mlir::Location loc) {
+mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
     if (auto it = mlirValues_.find(id); it != mlirValues_.end()) {
         return it->second;
     }
@@ -74,7 +80,7 @@ mlir::Value MLIRGraph::getOrAddValue(NodeId id, mlir::Location loc) {
     );
 
     mlir::Block &entry = fwdFunc_.getBody().front();
-    mlir::Value arg = entry.addArgument(tensorType, loc);
+    mlir::Value arg = entry.addArgument(tensorType, makeNodeLoc(id));
     mlirValues_[id] = arg;
     inputArgNodes_.push_back(id); // track arg order for ExecutionEngine later
     return arg;
@@ -96,11 +102,7 @@ NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     llvm::SmallVector<mlir::Value, 4> mlirInputs;
     for (NodeId id : node.inputs) {
         // TODO: fix so that you see names instead of %arg0 
-        std::string argName(node.op->name());
-        mlir::Location argLoc = mlir::NameLoc::get(
-            builder_.getStringAttr(argName+std::to_string(id)), builder_.getUnknownLoc()
-        );
-        mlirInputs.push_back(getOrAddValue(id, argLoc));
+        mlirInputs.push_back(getOrAddValue(id));
     }
 
     // 3. Emit the op (using Option A dispatch table; for Option B use node.op->emitMLIR)
@@ -157,8 +159,29 @@ std::vector<std::pair<Tensor *, Tensor *>> MLIRGraph::paramPairs() {
 void MLIRGraph::print() {
     std::printf("=== MLIR Module Dump ===\n");
     if (module_) {
+        mlir::OpPrintingFlags flags;
+        // flags.enableDebugInfo();
         // Dumps the entire MLIR module (functions, linalg ops, tensors, etc.) to stdout
-        module_->dump();
+        // module_->dump();
+        module_->print(llvm::errs(),flags);
+        
+        // Alternatively, if you prefer using LLVM's stream operator:
+        // module_->print(llvm::outs());
+        // llvm::outs() << "\n";
+    } else {
+        std::printf("(Module is empty or not initialized)\n");
+    }
+    std::printf("==========================\n");
+}
+
+void MLIRGraph::dump() {
+    std::printf("=== MLIR Module Dump ===\n");
+    if (module_) {
+        mlir::OpPrintingFlags flags;
+        flags.enableDebugInfo();
+        // Dumps the entire MLIR module (functions, linalg ops, tensors, etc.) to stdout
+        // module_->dump();
+        module_->print(llvm::errs(),flags);
         
         // Alternatively, if you prefer using LLVM's stream operator:
         // module_->print(llvm::outs());

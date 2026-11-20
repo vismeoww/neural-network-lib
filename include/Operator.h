@@ -186,6 +186,6 @@ struct MSELoss : Op {
     }
   }
   mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
-    assert(0&&"not implemented");
+    return emitMSELoss(b,loc,inputs[0],inputs[1]);
   }
 };

@@ -17,13 +17,14 @@ private:
     std::vector<NodeId> inputArgNodes_;
 
     void initParam(Tensor &t, Init init);
+    mlir::Location makeNodeLoc(NodeId id);
 
 public:
     explicit MLIRGraph(unsigned int seed = 42);
     // ~MLIRGraph() override = default;
 
     NodeId param(Shape s, Init init, std::string label = "") override;
-    mlir::Value getOrAddValue(NodeId id, mlir::Location loc);
+    mlir::Value getOrAddValue(NodeId id);
     NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in) override;
    
     void finalizeForward(NodeId outputNode);
@@ -35,4 +36,5 @@ public:
     
     std::vector<std::pair<Tensor *, Tensor *>> paramPairs() override;
     void print() override;
+    void dump();
 };

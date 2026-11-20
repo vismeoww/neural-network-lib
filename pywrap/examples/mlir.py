@@ -12,5 +12,7 @@ h1_relu = pynn.relu(g, h1)
 
 pred_id = pynn.linear(g, h1_relu, out=1, init=pynn.Init.He)
 
-g.finalizeForward(pred_id)
+loss_id = pynn.mse_loss(g,pred_id, target_id)
+
+g.finalizeForward(loss_id)
 g.print()
