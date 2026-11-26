@@ -1,10 +1,10 @@
-#include "MLIRGraph.hpp"
+#include "MLIR/MLIRGraph.hpp"
 #include <mlir/InitAllDialects.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <llvm/Support/raw_ostream.h>
 
 
-void MLIRGraph::initParam(Tensor &t, Init init){
+void MLIRGraph::initParam(Tensor &t, MLIRInit init){
     // assert(0&&"not implemented");
     // Zero-initialize for now (adjust to your Tensor's underlying storage, e.g., t.data)
     std::fill(t.v.begin(), t.v.end(), 0.0f);
@@ -18,7 +18,7 @@ mlir::Location MLIRGraph::makeNodeLoc(NodeId id) {
 }
 
 MLIRGraph::MLIRGraph(unsigned int seed) 
-    : Graph(seed), builder_(&context_) {
+    : rng_(seed), builder_(&context_) {
     // Register all upstream dialects
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
@@ -37,8 +37,8 @@ MLIRGraph::MLIRGraph(unsigned int seed)
     builder_.setInsertionPointToStart(entryBlock);
 }
 
-NodeId MLIRGraph::param(Shape s, Init init, std::string label) {
-    Node node;
+NodeId MLIRGraph::param(Shape s, MLIRInit init, std::string label) {
+    MLIRNode node;
     node.value.resize(s);
     node.grad.resize(s);
     node.label = std::move(label);
@@ -86,8 +86,8 @@ mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
     return arg;
 }
 
-NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
-    Node node;
+NodeId MLIRGraph::apply(std::unique_ptr<MLIROp> op, std::vector<NodeId> in) {
+    MLIRNode node;
     node.op = std::move(op);
     node.inputs = std::vector<NodeId>{in.begin(), in.end()};
    
@@ -110,7 +110,8 @@ NodeId MLIRGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     // auto it = emitters_.find(node.op->name());
     // assert(it != emitters_.end() && "Unsupported MLIR op");
     // mlir::Value result = it->second(builder_, loc, mlirInputs);
-    mlir::Value result = node.op->emitMLIR(builder_,loc,mlirInputs);
+    // mlir::Value result = node.op->emitMLIR(builder_,loc,mlirInputs);
+    mlir::Value result = nullptr;
 
     // 4. Register the node and its MLIR value
     NodeId outId = static_cast<NodeId>(nodes_.size());
@@ -151,7 +152,7 @@ void MLIRGraph::reshape() {
 
 std::vector<std::pair<Tensor *, Tensor *>> MLIRGraph::paramPairs() {
     std::vector<std::pair<Tensor *, Tensor *>> p;
-    for (Node &n : nodes_)
+    for (MLIRNode &n : nodes_)
       if (n.isParam) p.emplace_back(&n.value, &n.grad);
     return p;
 }

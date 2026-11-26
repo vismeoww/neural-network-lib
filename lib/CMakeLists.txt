@@ -1,9 +1,9 @@
 
 add_library(NNLib 
     Tensor.cpp
-    CPUGraph.cpp
-    MLIRGraph.cpp
-    MLIROp.cpp
+    CPU/CPUGraph.cpp
+    MLIR/MLIRGraph.cpp
+    MLIR/MLIROp.cpp
 )
 set_property(TARGET NNLib PROPERTY POSITION_INDEPENDENT_CODE ON)
 

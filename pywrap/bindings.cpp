@@ -2,10 +2,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
-#include "CPUGraph.hpp"
-#include "MLIRGraph.hpp"
+#include "CPU/CPUGraph.hpp"
+#include "MLIR/MLIRGraph.hpp"
 #include "Tensor.h"
-#include "Operator.h"
+#include "CPU/CPUOp.h"
+#include "CPU/Optimizer.hpp"
 
 
 int add(int i, int j) {
@@ -74,21 +75,21 @@ PYBIND11_MODULE(pynn, m) {
         });
 
     // Bind the abstract/base Graph class first
-    py::class_<Graph>(m, "Graph")
-        .def("input", &Graph::input, py::arg("s"), py::arg("label") = "",
-             py::return_value_policy::reference_internal)
-        .def("num_nodes", &Graph::numNodes)
-        .def("value", [](Graph &g, size_t id) -> Tensor& {
-            return g.value(id);
-        }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("grad", [](Graph &g, size_t id) -> Tensor& {
-            return g.grad(id);
-    }, py::return_value_policy::reference_internal, py::arg("id"));
+    // py::class_<Graph>(m, "Graph")
+    //     .def("input", &Graph::input, py::arg("s"), py::arg("label") = "",
+    //          py::return_value_policy::reference_internal)
+    //     .def("num_nodes", &Graph::numNodes)
+    //     .def("value", [](Graph &g, size_t id) -> Tensor& {
+    //         return g.value(id);
+    //     }, py::return_value_policy::reference_internal, py::arg("id"))
+    //     .def("grad", [](Graph &g, size_t id) -> Tensor& {
+    //         return g.grad(id);
+    // }, py::return_value_policy::reference_internal, py::arg("id"));
 
     // =========================================================================
     // 4. Bind Graph Class
     // =========================================================================
-    py::class_<CPUGraph, Graph>(m, "CPUGraph")
+    py::class_<CPUGraph>(m, "CPUGraph")
         .def(py::init<unsigned>(), py::arg("seed") = 42)
         .def("input", &CPUGraph::input, py::arg("s"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
@@ -127,7 +128,7 @@ PYBIND11_MODULE(pynn, m) {
         .def("step", &SGD::step);
 
     // MLIR Graph
-    py::class_<MLIRGraph, Graph>(m, "MLIRGraph")
+    py::class_<MLIRGraph>(m, "MLIRGraph")
         .def(py::init<unsigned>(), py::arg("seed") = 42)
         .def("input", &MLIRGraph::input, py::arg("s"), py::arg("label") = "",
              py::return_value_policy::reference_internal)

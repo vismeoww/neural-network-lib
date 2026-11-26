@@ -29,12 +29,13 @@
 // ============================================================================
 // Op interface
 // ============================================================================
-#include "Operator.h"
+#include "CPU/CPUOp.h"
 
 // ============================================================================
 // Graph
 // ============================================================================
-#include "CPUGraph.hpp"
+#include "CPU/CPUGraph.hpp"
+#include "CPU/Optimizer.hpp"
 
 
 // ============================================================================
@@ -92,7 +93,7 @@ static void runGradChecks() {
 
   struct Case {
     const char *name;
-    NodeId (*act)(Graph &, NodeId);
+    NodeId (*act)(CPUGraph &, NodeId);
   } cases[] = {{"tanh", tanh_}, {"sigmoid", sigmoid}, {"relu", relu}};
 
   for (auto &c : cases) {
