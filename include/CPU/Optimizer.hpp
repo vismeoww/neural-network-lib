@@ -2,6 +2,8 @@
 
 #include "Tensor.h"
 
+namespace cpu{
+
 using ParamList = std::vector<std::pair<Tensor *, Tensor *>>; // (value, grad)
 
 struct Optimizer {
@@ -54,3 +56,5 @@ struct Adam : Optimizer {
     }
   }
 };
+
+}

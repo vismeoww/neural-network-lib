@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pywrap.pynn as pynn
+import pywrap.pynn.cpu as pynn
+import pywrap.pynn as nn
 
 # 1. Generate Synthetic Polynomial Data
 np.random.seed(42)
@@ -15,8 +16,8 @@ y_np = (0.5 * (x_np ** 3) - 1.5 * x_np + 0.5).astype(np.float32)
 g = pynn.CPUGraph(seed=42)
 
 # Define inputs with shape [N, 1]
-x_id = g.input(pynn.Shape(N, 1), label="x")
-target_id = g.input(pynn.Shape(N, 1), label="target")
+x_id = g.input(nn.Shape(N, 1), label="x")
+target_id = g.input(nn.Shape(N, 1), label="target")
 
 # Build a small Multi-Layer Perceptron (MLP) for non-linear curve fitting
 h1 = pynn.linear(g, x_id, out=32, init=pynn.Init.He)

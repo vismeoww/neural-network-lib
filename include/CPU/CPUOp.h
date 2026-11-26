@@ -29,6 +29,8 @@
 // Op interface
 // ============================================================================
 
+namespace cpu{
+
 struct Op {
   virtual ~Op() = default;
   virtual const char *name() const = 0;
@@ -188,3 +190,6 @@ struct MSELoss : Op {
   //   return emitMSELoss(b,loc,inputs[0],inputs[1]);
   // }
 };
+
+
+}

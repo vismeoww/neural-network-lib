@@ -1,5 +1,7 @@
 #include "MLIR/MLIROp.hpp"
 
+namespace mlg{
+
 // 1. Matrix Multiplication
 mlir::Value emitMatmul(mlir::OpBuilder &builder, mlir::Location loc,
                        mlir::Value lhs, mlir::Value rhs)
@@ -147,4 +149,6 @@ mlir::Value emitMSELoss(mlir::OpBuilder &builder, mlir::Location loc,
     );
 
     return genericOp.getResult(0);
+}
+
 }

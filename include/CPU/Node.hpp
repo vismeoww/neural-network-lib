@@ -2,6 +2,8 @@
 #include "Tensor.h"
 #include "CPU/CPUOp.h"
 
+namespace cpu{
+
 using NodeId = int;
 enum class Init { Zero, He, Xavier };
 
@@ -13,3 +15,5 @@ struct CPUNode {
   bool isParam = false;
   std::string label;
 };
+
+}

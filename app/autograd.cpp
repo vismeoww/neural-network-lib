@@ -37,13 +37,14 @@
 #include "CPU/CPUGraph.hpp"
 #include "CPU/Optimizer.hpp"
 
+using namespace cpu;
 
 // ============================================================================
 // Gradient check: compares analytic gradients with central differences.
 // Returns the max relative error over all (or up to maxPerParam) entries.
 // ============================================================================
 
-double gradCheck(CPUGraph &g, NodeId loss, double eps = 1e-6,
+double gradCheck(Graph &g, NodeId loss, double eps = 1e-6,
                  size_t maxPerParam = 50) {
   g.forward();
   g.backward(loss);
@@ -93,11 +94,11 @@ static void runGradChecks() {
 
   struct Case {
     const char *name;
-    NodeId (*act)(CPUGraph &, NodeId);
+    NodeId (*act)(Graph &, NodeId);
   } cases[] = {{"tanh", tanh_}, {"sigmoid", sigmoid}, {"relu", relu}};
 
   for (auto &c : cases) {
-    CPUGraph g(1);
+    Graph g(1);
     NodeId x = g.input({5, 3});
     NodeId t = g.input({5, 2});
     NodeId h = c.act(g, linear(g, x, 4));
@@ -131,7 +132,7 @@ int main() {
   }
 
   // ---- model ---------------------------------------------------------------
-  CPUGraph g(42);
+  Graph g(42);
   NodeId x = g.input({B, 1}, "x");
   NodeId t = g.input({B, 1}, "target");
   NodeId h1 = tanh_(g, linear(g, x, 32, Init::Xavier));

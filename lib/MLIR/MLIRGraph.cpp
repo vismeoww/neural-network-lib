@@ -1,23 +1,25 @@
-#include "MLIR/MLIRGraph.hpp"
 #include <mlir/InitAllDialects.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "MLIR/MLIRGraph.hpp"
+#include "MLIR/MLIROp.hpp"
+namespace mlg{
 
-void MLIRGraph::initParam(Tensor &t, MLIRInit init){
+void Graph::initParam(Tensor &t, MLIRInit init){
     // assert(0&&"not implemented");
     // Zero-initialize for now (adjust to your Tensor's underlying storage, e.g., t.data)
     std::fill(t.v.begin(), t.v.end(), 0.0f);
     (void)init; // silence unused parameter warning until He/Xavier are added
 }
 
-mlir::Location MLIRGraph::makeNodeLoc(NodeId id) {
+mlir::Location Graph::makeNodeLoc(NodeId id) {
     const std::string &label = nodes_[id].label;
     std::string name = label.empty() ? ("node" + std::to_string(id)) : label;
     return mlir::NameLoc::get(builder_.getStringAttr(name));
 }
 
-MLIRGraph::MLIRGraph(unsigned int seed) 
+Graph::Graph(unsigned int seed) 
     : rng_(seed), builder_(&context_) {
     // Register all upstream dialects
     mlir::DialectRegistry registry;
@@ -37,7 +39,7 @@ MLIRGraph::MLIRGraph(unsigned int seed)
     builder_.setInsertionPointToStart(entryBlock);
 }
 
-NodeId MLIRGraph::param(Shape s, MLIRInit init, std::string label) {
+NodeId Graph::param(Shape s, MLIRInit init, std::string label) {
     MLIRNode node;
     node.value.resize(s);
     node.grad.resize(s);
@@ -67,7 +69,7 @@ NodeId MLIRGraph::param(Shape s, MLIRInit init, std::string label) {
     return id;
 }
 
-mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
+mlir::Value Graph::getOrAddValue(NodeId id) {
     if (auto it = mlirValues_.find(id); it != mlirValues_.end()) {
         return it->second;
     }
@@ -86,7 +88,7 @@ mlir::Value MLIRGraph::getOrAddValue(NodeId id) {
     return arg;
 }
 
-NodeId MLIRGraph::apply(std::unique_ptr<MLIROp> op, std::vector<NodeId> in) {
+NodeId Graph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     MLIRNode node;
     node.op = std::move(op);
     node.inputs = std::vector<NodeId>{in.begin(), in.end()};
@@ -120,7 +122,7 @@ NodeId MLIRGraph::apply(std::unique_ptr<MLIROp> op, std::vector<NodeId> in) {
     return outId;
 }
 
-void MLIRGraph::finalizeForward(NodeId outputNode) {
+void Graph::finalizeForward(NodeId outputNode) {
     auto loc = builder_.getUnknownLoc();
     mlir::Value outVal = mlirValues_.at(outputNode);
 
@@ -133,31 +135,31 @@ void MLIRGraph::finalizeForward(NodeId outputNode) {
     fwdFunc_.setFunctionType(newType);
 }
 
-void MLIRGraph::forward(){
+void Graph::forward(){
     assert(0&&"not implemented");
 }
 
-void MLIRGraph::backward(NodeId loss){
+void Graph::backward(NodeId loss){
     assert(0&&"not implemented");
 }
 
-void MLIRGraph::setInputShape(NodeId i, Shape s){
+void Graph::setInputShape(NodeId i, Shape s){
     assert(0&&"not implemented");
 }
 
-void MLIRGraph::reshape() {
+void Graph::reshape() {
     assert(0&&"not implemented");
 }
 
 
-std::vector<std::pair<Tensor *, Tensor *>> MLIRGraph::paramPairs() {
+std::vector<std::pair<Tensor *, Tensor *>> Graph::paramPairs() {
     std::vector<std::pair<Tensor *, Tensor *>> p;
     for (MLIRNode &n : nodes_)
       if (n.isParam) p.emplace_back(&n.value, &n.grad);
     return p;
 }
 
-void MLIRGraph::print() {
+void Graph::print() {
     std::printf("=== MLIR Module Dump ===\n");
     if (module_) {
         mlir::OpPrintingFlags flags;
@@ -175,7 +177,7 @@ void MLIRGraph::print() {
     std::printf("==========================\n");
 }
 
-void MLIRGraph::dump() {
+void Graph::dump() {
     std::printf("=== MLIR Module Dump ===\n");
     if (module_) {
         mlir::OpPrintingFlags flags;
@@ -191,4 +193,27 @@ void MLIRGraph::dump() {
         std::printf("(Module is empty or not initialized)\n");
     }
     std::printf("==========================\n");
+}
+
+
+NodeId linear(Graph &g, NodeId x, size_t out, MLIRInit init) {
+  const size_t in = g.shape(x).c;
+  NodeId W = g.param({in, out}, init, "W");
+  NodeId b = g.param({1, out}, MLIRInit::Zero, "b");
+  NodeId xw = g.apply(std::make_unique<MatMul>(), {x, W});
+  return g.apply(std::make_unique<AddBias>(), {xw, b});
+}
+NodeId relu(Graph &g, NodeId x) {
+  return g.apply(std::make_unique<Relu>(), {x});
+}
+// NodeId sigmoid(Graph &g, NodeId x) {
+//   return g.apply(std::make_unique<Sigmoid>(), {x});
+// }
+// NodeId tanh_(Graph &g, NodeId x) {
+//   return g.apply(std::make_unique<Tanh>(), {x});
+// }
+NodeId mseLoss(Graph &g, NodeId pred, NodeId target) {
+  return g.apply(std::make_unique<MSELoss>(), {pred, target});
+}
+
 }

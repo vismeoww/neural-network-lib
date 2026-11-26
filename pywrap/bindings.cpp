@@ -4,6 +4,7 @@
 
 #include "CPU/CPUGraph.hpp"
 #include "MLIR/MLIRGraph.hpp"
+#include "MLIR/Node.hpp"
 #include "Tensor.h"
 #include "CPU/CPUOp.h"
 #include "CPU/Optimizer.hpp"
@@ -32,16 +33,7 @@ PYBIND11_MODULE(pynn, m) {
         });
 
     // =========================================================================
-    // 2. Bind Init Enum (assuming it exists)
-    // =========================================================================
-    py::enum_<Init>(m, "Init")
-        .value("He", Init::He)
-        .value("Xavier", Init::Xavier)
-        .value("Zero", Init::Zero)
-        .export_values();
-
-    // =========================================================================
-    // 3. Bind Tensor with 2D NumPy Interoperability
+    // 2. Bind Tensor with 2D NumPy Interoperability
     // =========================================================================
     py::class_<Tensor>(m, "Tensor")
         .def(py::init<>())
@@ -74,79 +66,106 @@ PYBIND11_MODULE(pynn, m) {
             t.v.assign(ptr, ptr + arr.size());
         });
 
-    // Bind the abstract/base Graph class first
-    // py::class_<Graph>(m, "Graph")
-    //     .def("input", &Graph::input, py::arg("s"), py::arg("label") = "",
-    //          py::return_value_policy::reference_internal)
-    //     .def("num_nodes", &Graph::numNodes)
-    //     .def("value", [](Graph &g, size_t id) -> Tensor& {
-    //         return g.value(id);
-    //     }, py::return_value_policy::reference_internal, py::arg("id"))
-    //     .def("grad", [](Graph &g, size_t id) -> Tensor& {
-    //         return g.grad(id);
-    // }, py::return_value_policy::reference_internal, py::arg("id"));
-
     // =========================================================================
-    // 4. Bind Graph Class
+    // 3.0. Create submodule for cpu based features
     // =========================================================================
-    py::class_<CPUGraph>(m, "CPUGraph")
-        .def(py::init<unsigned>(), py::arg("seed") = 42)
-        .def("input", &CPUGraph::input, py::arg("s"), py::arg("label") = "",
-             py::return_value_policy::reference_internal)
-        .def("param", &CPUGraph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
-             py::return_value_policy::reference_internal)
-        .def("forward", &CPUGraph::forward)
-        .def("backward", &CPUGraph::backward, py::arg("loss"))
-        .def("set_input_shape", &CPUGraph::setInputShape)
-        .def("reshape", &CPUGraph::reshape)
-        .def("num_nodes", &CPUGraph::numNodes)
-        .def("print", &CPUGraph::print)
-        .def("value", [](CPUGraph &g, size_t id) -> Tensor& {
-            return g.value(id);
-        }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("grad", [](CPUGraph &g, size_t id) -> Tensor& {
-            return g.grad(id);
-        }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("param_pairs", &CPUGraph::paramPairs, py::return_value_policy::reference_internal);
-
-    // =========================================================================
-    // 5. Bind Layer Helpers
-    // =========================================================================
-    m.def("linear", &linear, py::arg("g"), py::arg("x"), py::arg("out"), py::arg("init") = Init::He);
-    m.def("relu", &relu, py::arg("g"), py::arg("x"));
-    m.def("sigmoid", &sigmoid, py::arg("g"), py::arg("x"));
-    m.def("tanh", &tanh_, py::arg("g"), py::arg("x"));
-    m.def("mse_loss", &mseLoss, py::arg("g"), py::arg("pred"), py::arg("target"));
-
-    // =========================================================================
-    // 6. Bind Optimizers
-    // =========================================================================
-    py::class_<Optimizer>(m, "Optimizer");
+    py::module_ cpum = m.def_submodule("cpu", "CPU Based features module");
     
-    py::class_<SGD, Optimizer>(m, "SGD")
-        .def(py::init<Scalar, Scalar>(), py::arg("lr"), py::arg("momentum") = 0.0)
-        .def("step", &SGD::step);
+    // =========================================================================
+    // 3.1. Bind Init Enum (assuming it exists)
+    // =========================================================================
+    py::enum_<cpu::Init>(cpum, "Init")
+        .value("He", cpu::Init::He)
+        .value("Xavier", cpu::Init::Xavier)
+        .value("Zero", cpu::Init::Zero)
+        .export_values();
 
-    // MLIR Graph
-    py::class_<MLIRGraph>(m, "MLIRGraph")
+    // =========================================================================
+    // 3.2. Bind Graph Class
+    // =========================================================================
+    py::class_<cpu::Graph>(cpum, "CPUGraph")
         .def(py::init<unsigned>(), py::arg("seed") = 42)
-        .def("input", &MLIRGraph::input, py::arg("s"), py::arg("label") = "",
+        .def("input", &cpu::Graph::input, py::arg("s"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
-        .def("param", &MLIRGraph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
+        .def("param", &cpu::Graph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
-        .def("finalizeForward", &MLIRGraph::finalizeForward, py::arg("outputNode"))
-        .def("forward", &MLIRGraph::forward)
-        .def("backward", &MLIRGraph::backward, py::arg("loss"))
-        .def("set_input_shape", &MLIRGraph::setInputShape)
-        .def("reshape", &MLIRGraph::reshape)
-        .def("num_nodes", &MLIRGraph::numNodes)
-        .def("print", &MLIRGraph::print)
-        .def("dump", &MLIRGraph::dump)
-        .def("value", [](MLIRGraph &g, size_t id) -> Tensor& {
+        .def("forward", &cpu::Graph::forward)
+        .def("backward", &cpu::Graph::backward, py::arg("loss"))
+        .def("set_input_shape", &cpu::Graph::setInputShape)
+        .def("reshape", &cpu::Graph::reshape)
+        .def("num_nodes", &cpu::Graph::numNodes)
+        .def("print", &cpu::Graph::print)
+        .def("value", [](cpu::Graph &g, size_t id) -> Tensor& {
             return g.value(id);
         }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("grad", [](MLIRGraph &g, size_t id) -> Tensor& {
+        .def("grad", [](cpu::Graph &g, size_t id) -> Tensor& {
             return g.grad(id);
         }, py::return_value_policy::reference_internal, py::arg("id"))
-        .def("param_pairs", &MLIRGraph::paramPairs, py::return_value_policy::reference_internal);
+        .def("param_pairs", &cpu::Graph::paramPairs, py::return_value_policy::reference_internal);
+
+    // =========================================================================
+    // 3.3. Bind Layer Helpers
+    // =========================================================================
+    cpum.def("linear", &cpu::linear, py::arg("g"), py::arg("x"), py::arg("out"), py::arg("init") = cpu::Init::He);
+    cpum.def("relu", &cpu::relu, py::arg("g"), py::arg("x"));
+    cpum.def("sigmoid", &cpu::sigmoid, py::arg("g"), py::arg("x"));
+    cpum.def("tanh", &cpu::tanh_, py::arg("g"), py::arg("x"));
+    cpum.def("mse_loss", &cpu::mseLoss, py::arg("g"), py::arg("pred"), py::arg("target"));
+
+    // =========================================================================
+    // 3.4. Bind Optimizers
+    // =========================================================================
+    py::class_<cpu::Optimizer>(cpum, "Optimizer");
+    
+    py::class_<cpu::SGD, cpu::Optimizer>(cpum, "SGD")
+        .def(py::init<Scalar, Scalar>(), py::arg("lr"), py::arg("momentum") = 0.0)
+        .def("step", &cpu::SGD::step);
+    
+    // =========================================================================
+    // 4.0. Create submodule for cpu based features
+    // =========================================================================
+    py::module_ mlirm = m.def_submodule("mlir", "MLIR Based features module");
+    
+    // =========================================================================
+    // 4.1. Bind MLIRInit Enum (assuming it exists)
+    // =========================================================================
+    py::enum_<mlg::MLIRInit>(mlirm, "MLIRInit")
+        .value("He", mlg::MLIRInit::He)
+        .value("Xavier", mlg::MLIRInit::Xavier)
+        .value("Zero", mlg::MLIRInit::Zero)
+        .export_values();
+
+    // =========================================================================
+    // 4.1. Bind MLIRGraph 
+    // =========================================================================
+    py::class_<mlg::Graph>(mlirm, "MLIRGraph")
+        .def(py::init<unsigned>(), py::arg("seed") = 42)
+        .def("input", &mlg::Graph::input, py::arg("s"), py::arg("label") = "",
+             py::return_value_policy::reference_internal)
+        .def("param", &mlg::Graph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
+             py::return_value_policy::reference_internal)
+        .def("finalizeForward", &mlg::Graph::finalizeForward, py::arg("outputNode"))
+        .def("forward", &mlg::Graph::forward)
+        .def("backward", &mlg::Graph::backward, py::arg("loss"))
+        .def("set_input_shape", &mlg::Graph::setInputShape)
+        .def("reshape", &mlg::Graph::reshape)
+        .def("num_nodes", &mlg::Graph::numNodes)
+        .def("print", &mlg::Graph::print)
+        .def("dump", &mlg::Graph::dump)
+        .def("value", [](mlg::Graph &g, size_t id) -> Tensor& {
+            return g.value(id);
+        }, py::return_value_policy::reference_internal, py::arg("id"))
+        .def("grad", [](mlg::Graph &g, size_t id) -> Tensor& {
+            return g.grad(id);
+        }, py::return_value_policy::reference_internal, py::arg("id"))
+        .def("param_pairs", &mlg::Graph::paramPairs, py::return_value_policy::reference_internal);
+
+    // =========================================================================
+    // 4.2. Bind Layer Helpers
+    // =========================================================================
+    mlirm.def("linear", &mlg::linear, py::arg("g"), py::arg("x"), py::arg("out"), py::arg("init") = mlg::MLIRInit::He);
+    mlirm.def("relu", &mlg::relu, py::arg("g"), py::arg("x"));
+    // mlirm.def("sigmoid", &mlg::sigmoid, py::arg("g"), py::arg("x"));
+    // mlirm.def("tanh", &mlg::tanh_, py::arg("g"), py::arg("x"));
+    mlirm.def("mse_loss", &mlg::mseLoss, py::arg("g"), py::arg("pred"), py::arg("target"));
 }

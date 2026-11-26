@@ -1,7 +1,9 @@
 #include "CPU/CPUGraph.hpp"
 
 
-void CPUGraph::initParam(Tensor &t, Init init) {
+namespace cpu{
+
+void Graph::initParam(Tensor &t, Init init) {
     const size_t fan_in = t.s.r, fan_out = t.s.c;
     switch (init) {
     case Init::Zero:
@@ -31,7 +33,7 @@ void CPUGraph::initParam(Tensor &t, Init init) {
 // }
 
 
-NodeId CPUGraph::param(Shape shape, Init init, std::string label) {
+NodeId Graph::param(Shape shape, Init init, std::string label) {
     CPUNode node;
     node.value.resize(shape);
     node.grad.resize(shape);
@@ -43,7 +45,7 @@ NodeId CPUGraph::param(Shape shape, Init init, std::string label) {
     return (NodeId)nodes_.size() - 1;
 }
 
-NodeId CPUGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
+NodeId Graph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
     CPUNode node;
     std::vector<Shape> shapes;
     for (NodeId i : in) {
@@ -62,7 +64,7 @@ NodeId CPUGraph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
 }
 
 
-void CPUGraph::forward() {
+void Graph::forward() {
     std::vector<const Tensor *> in;
     for (CPUNode &n : nodes_) {
       if (!n.op) continue;
@@ -72,7 +74,7 @@ void CPUGraph::forward() {
     }
 }
 
-void CPUGraph::backward(NodeId loss) {
+void Graph::backward(NodeId loss) {
     if (!nodes_[loss].requiresGrad)
       throw std::logic_error("backward: loss does not depend on any param");
     for (CPUNode &n : nodes_)
@@ -95,14 +97,14 @@ void CPUGraph::backward(NodeId loss) {
 }
 
 
-void CPUGraph::setInputShape(NodeId id, Shape s) {
+void Graph::setInputShape(NodeId id, Shape s) {
     if (nodes_[id].op || nodes_[id].isParam)
       throw std::invalid_argument("setInputShape: not an input leaf");
     nodes_[id].value.resize(s);
 }
 
 
-void CPUGraph::reshape() {
+void Graph::reshape() {
     for (CPUNode &n : nodes_) {
         if (!n.op) continue;
         std::vector<Shape> shapes;
@@ -113,7 +115,7 @@ void CPUGraph::reshape() {
     }
 }
 
-std::vector<std::pair<Tensor *, Tensor *>> CPUGraph::paramPairs() {
+std::vector<std::pair<Tensor *, Tensor *>> Graph::paramPairs() {
     std::vector<std::pair<Tensor *, Tensor *>> p;
     for (CPUNode &n : nodes_)
       if (n.isParam) p.emplace_back(&n.value, &n.grad);
@@ -121,7 +123,7 @@ std::vector<std::pair<Tensor *, Tensor *>> CPUGraph::paramPairs() {
 }
 
 
-void CPUGraph::print() {
+void Graph::print() {
     for (size_t i = 0; i < nodes_.size(); i++) {
       const CPUNode &n = nodes_[i];
       std::printf("%3zu  %-10s %zux%zu  %s", i, n.label.c_str(), n.value.s.r,
@@ -135,22 +137,24 @@ void CPUGraph::print() {
 }
 
 
-NodeId linear(CPUGraph &g, NodeId x, size_t out, Init init) {
+NodeId linear(Graph &g, NodeId x, size_t out, Init init) {
   const size_t in = g.shape(x).c;
   NodeId W = g.param({in, out}, init, "W");
   NodeId b = g.param({1, out}, Init::Zero, "b");
   NodeId xw = g.apply(std::make_unique<MatMul>(), {x, W});
   return g.apply(std::make_unique<AddBias>(), {xw, b});
 }
-NodeId relu(CPUGraph &g, NodeId x) {
+NodeId relu(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Relu>(), {x});
 }
-NodeId sigmoid(CPUGraph &g, NodeId x) {
+NodeId sigmoid(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Sigmoid>(), {x});
 }
-NodeId tanh_(CPUGraph &g, NodeId x) {
+NodeId tanh_(Graph &g, NodeId x) {
   return g.apply(std::make_unique<Tanh>(), {x});
 }
-NodeId mseLoss(CPUGraph &g, NodeId pred, NodeId target) {
+NodeId mseLoss(Graph &g, NodeId pred, NodeId target) {
   return g.apply(std::make_unique<MSELoss>(), {pred, target});
+}
+
 }

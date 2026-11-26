@@ -10,7 +10,9 @@
 #include "Tensor.h"
 #include "MLIROp.hpp"
 
-class MLIRGraph{
+namespace mlg{
+
+class Graph{
 private:
     mlir::MLIRContext context_;
     mlir::OpBuilder builder_;
@@ -25,8 +27,8 @@ private:
     mlir::Location makeNodeLoc(NodeId id);
 
 public:
-    explicit MLIRGraph(unsigned int seed = 42);
-    ~MLIRGraph() = default;
+    explicit Graph(unsigned int seed = 42);
+    ~Graph() = default;
     NodeId input(Shape s, std::string label = "")
     {
         MLIRNode node;
@@ -42,7 +44,7 @@ public:
 
     NodeId param(Shape s, MLIRInit init, std::string label = "");
     mlir::Value getOrAddValue(NodeId id);
-    NodeId apply(std::unique_ptr<MLIROp> op, std::vector<NodeId> in);
+    NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in);
    
     void finalizeForward(NodeId outputNode);
     void forward();
@@ -55,3 +57,15 @@ public:
     void print();
     void dump();
 };
+
+// ============================================================================
+// Layer helpers
+// ============================================================================
+
+NodeId linear(Graph &g, NodeId x, size_t out, MLIRInit init = MLIRInit::He);
+NodeId relu(Graph &g, NodeId x);
+NodeId sigmoid(Graph &g, NodeId x);
+NodeId tanh_(Graph &g, NodeId x);
+NodeId mseLoss(Graph &g, NodeId pred, NodeId target);
+
+}
