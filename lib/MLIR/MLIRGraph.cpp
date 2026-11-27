@@ -109,11 +109,7 @@ NodeId Graph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in) {
 
     // 3. Emit the op (using Option A dispatch table; for Option B use node.op->emitMLIR)
     auto loc = builder_.getUnknownLoc();
-    // auto it = emitters_.find(node.op->name());
-    // assert(it != emitters_.end() && "Unsupported MLIR op");
-    // mlir::Value result = it->second(builder_, loc, mlirInputs);
-    // mlir::Value result = node.op->emitMLIR(builder_,loc,mlirInputs);
-    mlir::Value result = nullptr;
+    mlir::Value result = node.op->emitMLIR(builder_,loc,mlirInputs);
 
     // 4. Register the node and its MLIR value
     NodeId outId = static_cast<NodeId>(nodes_.size());
@@ -163,14 +159,7 @@ void Graph::print() {
     std::printf("=== MLIR Module Dump ===\n");
     if (module_) {
         mlir::OpPrintingFlags flags;
-        // flags.enableDebugInfo();
-        // Dumps the entire MLIR module (functions, linalg ops, tensors, etc.) to stdout
-        // module_->dump();
         module_->print(llvm::errs(),flags);
-        
-        // Alternatively, if you prefer using LLVM's stream operator:
-        // module_->print(llvm::outs());
-        // llvm::outs() << "\n";
     } else {
         std::printf("(Module is empty or not initialized)\n");
     }
@@ -182,13 +171,7 @@ void Graph::dump() {
     if (module_) {
         mlir::OpPrintingFlags flags;
         flags.enableDebugInfo();
-        // Dumps the entire MLIR module (functions, linalg ops, tensors, etc.) to stdout
-        // module_->dump();
         module_->print(llvm::errs(),flags);
-        
-        // Alternatively, if you prefer using LLVM's stream operator:
-        // module_->print(llvm::outs());
-        // llvm::outs() << "\n";
     } else {
         std::printf("(Module is empty or not initialized)\n");
     }
