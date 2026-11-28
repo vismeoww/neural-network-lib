@@ -19,14 +19,6 @@ pybind11_add_module(pynn bindings.cpp)
 # 4. Link to your core C++ library from the /src directory
 target_link_libraries(pynn PRIVATE 
   NNLib
-  LLVMSupport
-  MLIRIR
-  MLIRSupport
-  MLIRFuncDialect
-  MLIRLinalgDialect
-  MLIRTensorDialect
-  MLIRArithDialect
-  MLIRRegisterAllDialects
 )
 
 target_compile_definitions(pynn PRIVATE ${LLVM_DEFINITIONS})

@@ -5,12 +5,33 @@
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/Tensor/IR/Tensor.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/ExecutionEngine/ExecutionEngine.h>
 
 #include "Node.hpp"
 #include "Tensor.h"
 #include "MLIROp.hpp"
 
 namespace mlg{
+
+struct MemRef2D {
+    Scalar *allocated;
+    Scalar *aligned;
+    int64_t offset;
+    int64_t sizes[2];
+    int64_t strides[2];
+};
+
+static MemRef2D toMemRef2D(Tensor &t) {
+    int64_t rows = static_cast<int64_t>(t.s.r);
+    int64_t cols = static_cast<int64_t>(t.s.c);
+    return MemRef2D{
+        t.v.data(), // allocated
+        t.v.data(), // aligned
+        0,          // offset
+        {rows, cols},
+        {cols, 1}   // row-major strides
+    };
+}
 
 class Graph{
 private:
@@ -22,6 +43,8 @@ private:
     std::vector<NodeId> inputArgNodes_;
     std::vector<MLIRNode> nodes_;
     std::mt19937 rng_;
+    NodeId outputNode_ = -1;
+    std::unique_ptr<mlir::ExecutionEngine> engine_;
 
     void initParam(Tensor &t, MLIRInit init);
     mlir::Location makeNodeLoc(NodeId id);
