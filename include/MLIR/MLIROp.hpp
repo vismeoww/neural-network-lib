@@ -20,12 +20,24 @@ mlir::Value emitRelu(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value i
 mlir::Value emitMSELoss(mlir::OpBuilder &builder, mlir::Location loc,
                         mlir::Value pred, mlir::Value target);
 
+mlir::Value emitAdd(mlir::OpBuilder &b, mlir::Location loc, mlir::Value lhs, mlir::Value rhs);
+mlir::Value emitTranspose(mlir::OpBuilder &b, mlir::Location loc, mlir::Value input);
+mlir::Value emitAddBiasBackwardBias(mlir::OpBuilder &b, mlir::Location loc, mlir::Value gradOut);
+mlir::Value emitReluBackward(mlir::OpBuilder &b, mlir::Location loc, mlir::Value fwdInput, mlir::Value gradOut);
+std::pair<mlir::Value, mlir::Value> emitMSELossBackward(
+    mlir::OpBuilder &b, mlir::Location loc, mlir::Value pred, mlir::Value target, mlir::Value gradOut);
 
 struct Op {
   virtual ~Op() = default;
   virtual const char *name() const = 0;
   virtual Shape outShape(const std::vector<Shape> &in) const = 0;
   virtual mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const = 0;
+  // Returns one gradient Value per forward input
+  virtual llvm::SmallVector<mlir::Value, 2> emitBackward(
+      mlir::OpBuilder &b, mlir::Location loc,
+      mlir::ValueRange fwdInputs,
+      mlir::Value fwdOutput,
+      mlir::Value gradOutput) const = 0;
 };
 
 struct MatMul: Op{
@@ -37,6 +49,16 @@ struct MatMul: Op{
   }
   mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
     return emitMatmul(b,loc,inputs[0],inputs[1]);
+  }
+  llvm::SmallVector<mlir::Value, 2> emitBackward(
+      mlir::OpBuilder &b, mlir::Location loc,
+      mlir::ValueRange fwdInputs, mlir::Value, mlir::Value gradOut) const override {
+    // Y = A @ B  =>  dA = dY @ B^T,  dB = A^T @ dY
+    mlir::Value A = fwdInputs[0];
+    mlir::Value B = fwdInputs[1];
+    mlir::Value dA = emitMatmul(b, loc, gradOut, emitTranspose(b, loc, B));
+    mlir::Value dB = emitMatmul(b, loc, emitTranspose(b, loc, A), gradOut);
+    return {dA, dB};
   }
 };
 
@@ -51,6 +73,14 @@ struct AddBias : Op {
   mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
     return emitAddBias(b,loc,inputs[0],inputs[1]);
   }
+  llvm::SmallVector<mlir::Value, 2> emitBackward(
+      mlir::OpBuilder &b, mlir::Location loc,
+      mlir::ValueRange, mlir::Value, mlir::Value gradOut) const override {
+    // Y = X + b  =>  dX = dY,  db = sum(dY, axis=0)
+    mlir::Value dX = gradOut;
+    mlir::Value db = emitAddBiasBackwardBias(b, loc, gradOut);
+    return {dX, db};
+  }
 };
 
 // ----------------------------------------------------------------------------
@@ -61,6 +91,12 @@ struct Relu : Op {
   Shape outShape(const std::vector<Shape> &s) const override { return s[0]; }
   mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
     return emitRelu(b,loc,inputs[0]);
+  }
+  llvm::SmallVector<mlir::Value, 2> emitBackward(
+      mlir::OpBuilder &b, mlir::Location loc,
+      mlir::ValueRange fwdInputs, mlir::Value, mlir::Value gradOut) const override {
+    // dX = (X > 0) ? dY : 0
+    return {emitReluBackward(b, loc, fwdInputs[0], gradOut)};
   }
 };
 
@@ -77,6 +113,12 @@ struct MSELoss : Op {
   }
   mlir::Value emitMLIR(mlir::OpBuilder& b, mlir::Location loc, mlir::ValueRange inputs) const override{
     return emitMSELoss(b,loc,inputs[0],inputs[1]);
+  }
+  llvm::SmallVector<mlir::Value, 2> emitBackward(
+      mlir::OpBuilder &b, mlir::Location loc,
+      mlir::ValueRange fwdInputs, mlir::Value, mlir::Value gradOut) const override {
+    auto [dPred, dTarget] = emitMSELossBackward(b, loc, fwdInputs[0], fwdInputs[1], gradOut);
+    return {dPred, dTarget};
   }
 };
 

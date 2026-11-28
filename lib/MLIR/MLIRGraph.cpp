@@ -28,8 +28,25 @@ namespace mlg
 void Graph::initParam(Tensor &t, MLIRInit init)
 {
     // Zero-initialize for now (adjust to your Tensor's underlying storage, e.g., t.data)
-    std::fill(t.v.begin(), t.v.end(), 0.0f);
-    (void)init; // silence unused parameter warning until He/Xavier are added
+    // std::fill(t.v.begin(), t.v.end(), 0.0f);
+    // (void)init; // silence unused parameter warning until He/Xavier are added
+    const size_t fan_in = t.s.r, fan_out = t.s.c;
+    switch (init) {
+    case MLIRInit::Zero:
+      t.zero();
+      break;
+    case MLIRInit::He: {
+      std::normal_distribution<Scalar> d(0.0, std::sqrt(2.0 / fan_in));
+      for (auto &x : t.v) x = d(rng_);
+      break;
+    }
+    case MLIRInit::Xavier: {
+      std::normal_distribution<Scalar> d(0.0,
+                                         std::sqrt(2.0 / (fan_in + fan_out)));
+      for (auto &x : t.v) x = d(rng_);
+      break;
+    }
+    }
 }
 
 mlir::Location Graph::makeNodeLoc(NodeId id)
@@ -150,19 +167,36 @@ NodeId Graph::apply(std::unique_ptr<Op> op, std::vector<NodeId> in)
     return outId;
 }
 
-void Graph::finalizeForward(NodeId outputNode)
+void Graph::finalizeForward(std::vector<NodeId> outputNodes)
 {
-    outputNode_ = outputNode;
+    outputNodes_ = std::move(outputNodes);
     auto loc = builder_.getUnknownLoc();
-    mlir::Value outVal = mlirValues_.at(outputNode);
+    // mlir::Value outVal = mlirValues_.at(outputNode);
 
     // 1. Emit func.return
-    mlir::func::ReturnOp::create(builder_, loc, outVal);
+    // mlir::func::ReturnOp::create(builder_, loc, outVal);
 
     // 2. Sync the FunctionType with the entry block's actual argument types
     mlir::Block &entry = fwdFunc_.getBody().front();
-    auto newType = builder_.getFunctionType(entry.getArgumentTypes(), {outVal.getType()});
-    fwdFunc_.setFunctionType(newType);
+
+    //append a destination memref argument for each requrested output 
+    for(NodeId outId : outputNodes_){
+        Shape s = nodes_[outId].value.s;
+        auto mType = mlir::MemRefType::get(
+            {static_cast<int64_t>(s.r), static_cast<int64_t>(s.c)},
+            builder_.getF32Type()
+        );
+        mlir::Value destMemRef = entry.addArgument(mType,makeNodeLoc(outId));
+
+        auto mat = mlir::bufferization::MaterializeInDestinationOp::create(
+            builder_, loc, /*resultType=*/mlir::Type(), mlirValues_.at(outId),destMemRef
+        );
+        mat.setWritable(true);
+    }
+
+    mlir::func::ReturnOp::create(builder_,loc);
+    auto newFnType = builder_.getFunctionType(entry.getArgumentTypes(), {});
+    fwdFunc_.setFunctionType(newFnType);
 
     // Emit C-compatible wrapper: _mlir_ciface_forward(MemRef2D* out, MemRef2D* arg0, ...)
     // fwdFunc_->setAttr(mlir::LLVM::LLVMDialect::getEmitCInterfaceAttrName(),
@@ -206,38 +240,30 @@ void Graph::finalizeForward(NodeId outputNode)
 
 void Graph::forward()
 {
-    if (!engine_ || outputNode_ < 0)
+    if (!engine_ || outputNodes_.empty())
     {
         throw std::runtime_error("Call finalizeForward() before forward()");
     }
 
     // 1. Prepare descriptors for all inputs/params in exact MLIR argument order
-    std::vector<MemRef2D> inDescs;
-    inDescs.reserve(inputArgNodes_.size());
-    for (NodeId id : inputArgNodes_)
-    {
-        inDescs.push_back(toMemRef2D(nodes_[id].value));
-    }
+    std::vector<MemRef2D> descs;
+    descs.reserve(inputArgNodes_.size() + outputNodes_.size());
+    for (NodeId id : inputArgNodes_)descs.push_back(toMemRef2D(nodes_[id].value));
+    for (NodeId id : outputNodes_)descs.push_back(toMemRef2D(nodes_[id].value));
 
     // 2. Output descriptor (populated by _mlir_ciface_forward)
-    MemRef2D outDesc{};
+    // MemRef2D outDesc{};
 
     // 3. Build pointer list: each C-interface arg is a MemRef2D*
     std::vector<MemRef2D *> argPtrs;
-    argPtrs.reserve(inDescs.size() + 1);
-    argPtrs.push_back(&outDesc);
-    for (auto &desc : inDescs)
-    {
-        argPtrs.push_back(&desc);
-    }
+    argPtrs.reserve(descs.size());
+    // argPtrs.push_back(&outDesc);
+    for (auto &desc : descs) argPtrs.push_back(&desc);
 
     // invokePacked expects void** pointing to each argument slot
-    llvm::SmallVector<void *, 8> packedArgs;
+    llvm::SmallVector<void *, 16> packedArgs;
     packedArgs.reserve(argPtrs.size());
-    for (auto &ptr : argPtrs)
-    {
-        packedArgs.push_back(&ptr);
-    }
+    for (auto &ptr : argPtrs) packedArgs.push_back(&ptr);
 
     // 4. Execute JIT-compiled function
     auto err = engine_->invokePacked("_mlir_ciface_forward", packedArgs);
@@ -248,14 +274,158 @@ void Graph::forward()
     }
 
     // 5. Copy result back into outputNode_'s Tensor and free MLIR's allocation
-    Tensor &outTensor = nodes_[outputNode_].value;
-    std::memcpy(outTensor.v.data(), outDesc.aligned, outTensor.v.size() * sizeof(float));
-    std::free(outDesc.allocated);
+    // Tensor &outTensor = nodes_[outputNode_].value;
+    // std::memcpy(outTensor.v.data(), outDesc.aligned, outTensor.v.size() * sizeof(float));
+    // std::free(outDesc.allocated);
+}
+
+void Graph::compileBackwards(NodeId loss){
+    compiledLossNode_ = loss;
+    bwdParamNodes_.clear();
+
+    // Create a fresh module for the backward pass so it can be lowered independently
+    mlir::OpBuilder b(&context_);
+    auto loc = b.getUnknownLoc();
+    auto bwdModule = mlir::ModuleOp::create(loc);
+    b.setInsertionPointToStart(bwdModule.getBody());
+
+    auto bwdFunc = mlir::func::FuncOp::create(b, loc, "backward", b.getFunctionType({}, {}));
+    mlir::Block *entry = bwdFunc.addEntryBlock();
+    b.setInsertionPointToStart(entry);
+
+    // 1. Add input & param tensor arguments (same order as inputArgNodes_)
+    std::map<NodeId, mlir::Value> fwdVals;
+    for (NodeId id : inputArgNodes_) {
+        Shape s = nodes_[id].value.s;
+        auto tType = mlir::RankedTensorType::get(
+            {static_cast<int64_t>(s.r), static_cast<int64_t>(s.c)}, b.getF32Type());
+        fwdVals[id] = entry->addArgument(tType, makeNodeLoc(id));
+    }
+
+    // 2. Add destination memref arguments for each parameter's gradient
+    std::map<NodeId, mlir::Value> gradDestMemrefs;
+    for (NodeId id = 0; id < static_cast<NodeId>(nodes_.size()); ++id) {
+        if (!nodes_[id].isParam) continue;
+        Shape s = nodes_[id].grad.s;
+        auto mType = mlir::MemRefType::get(
+            {static_cast<int64_t>(s.r), static_cast<int64_t>(s.c)}, b.getF32Type());
+        gradDestMemrefs[id] = entry->addArgument(mType, makeNodeLoc(id));
+        bwdParamNodes_.push_back(id);
+    }
+
+    // 3. Re-emit forward ops up to `loss` so all intermediate SSA activations are in scope
+    for (NodeId id = 0; id <= loss; ++id) {
+        if (!nodes_[id].op) continue;
+        llvm::SmallVector<mlir::Value, 4> inVals;
+        for (NodeId inId : nodes_[id].inputs) inVals.push_back(fwdVals.at(inId));
+        fwdVals[id] = nodes_[id].op->emitMLIR(b, loc, inVals);
+    }
+
+    // 4. Seed dL/dLoss = ones([1, 1])
+    Shape lossShape = nodes_[loss].value.s;
+    auto emptySeed = mlir::tensor::EmptyOp::create(
+        b, loc, llvm::ArrayRef<int64_t>{static_cast<int64_t>(lossShape.r), static_cast<int64_t>(lossShape.c)},
+        b.getF32Type());
+    auto one = mlir::arith::ConstantOp::create(b, loc, b.getF32FloatAttr(1.0f));
+    mlir::Value seedGrad = mlir::linalg::FillOp::create(
+        b, loc, mlir::ValueRange{one}, mlir::ValueRange{emptySeed}).getResult(0);
+
+    std::map<NodeId, mlir::Value> grads;
+    grads[loss] = seedGrad;
+
+    // 5. Reverse-mode autodiff walk (nodes_ is already in topological order)
+    for (NodeId id = loss; id >= 0; --id) {
+        auto it = grads.find(id);
+        if (it == grads.end() || !nodes_[id].op) continue;
+
+        llvm::SmallVector<mlir::Value, 4> inVals;
+        for (NodeId inId : nodes_[id].inputs) inVals.push_back(fwdVals.at(inId));
+
+        auto inGrads = nodes_[id].op->emitBackward(b, loc, inVals, fwdVals.at(id), it->second);
+        for (size_t i = 0; i < nodes_[id].inputs.size(); ++i) {
+            NodeId inId = nodes_[id].inputs[i];
+            if (grads.count(inId)) {
+                grads[inId] = emitAdd(b, loc, grads[inId], inGrads[i]);
+            } else {
+                grads[inId] = inGrads[i];
+            }
+        }
+    }
+
+    // 6. Materialize each parameter gradient directly into its destination memref
+    for (NodeId id : bwdParamNodes_) {
+        if (!grads.count(id)) continue;
+        auto mat = mlir::bufferization::MaterializeInDestinationOp::create(
+            b, loc, /*resultType=*/mlir::Type(), grads[id], gradDestMemrefs[id]);
+        mat.setWritable(true);
+    }
+
+    mlir::func::ReturnOp::create(b, loc);
+    bwdFunc.setFunctionType(b.getFunctionType(entry->getArgumentTypes(), {}));
+    // bwdFunc->setAttr(mlir::LLVM::LLVMDialect::getEmitCInterfaceAttrName(),
+    //                  mlir::UnitAttr::get(&context_));
+    bwdFunc->setAttr("llvm.emit_c_interface",
+                        mlir::UnitAttr::get(&context_));
+
+    // 7. Lower and JIT-compile (same pipeline as finalizeForward)
+    mlir::PassManager pm(&context_);
+    mlir::bufferization::OneShotBufferizePassOptions bufOpts;
+    bufOpts.bufferizeFunctionBoundaries = true;
+    pm.addPass(mlir::bufferization::createOneShotBufferizePass(bufOpts));
+    pm.addPass(mlir::createConvertLinalgToLoopsPass());
+    // pm.addPass(mlir::createConvertSCFToCFPass());
+    pm.addPass(mlir::createSCFToControlFlowPass());
+    pm.addPass(mlir::createConvertControlFlowToLLVMPass());
+    pm.addPass(mlir::createArithToLLVMConversionPass());
+    pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+    pm.addPass(mlir::createConvertFuncToLLVMPass());
+    pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+
+    if (mlir::failed(pm.run(bwdModule))) {
+        throw std::runtime_error("Backward MLIR lowering pipeline failed");
+    }
+
+    mlir::ExecutionEngineOptions engineOpts;
+    engineOpts.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+    auto maybeEngine = mlir::ExecutionEngine::create(bwdModule, engineOpts);
+    if (!maybeEngine) {
+        llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase &e) {
+            throw std::runtime_error("Backward ExecutionEngine failed: " + e.message());
+        });
+    }
+    bwdEngine_ = std::move(*maybeEngine);
 }
 
 void Graph::backward(NodeId loss)
 {
-    assert(0 && "not implemented");
+    if (!bwdEngine_ || compiledLossNode_ != loss) {
+        compileBackwards(loss);
+    }
+
+    // Build descriptors: [inputs/params..., param_grad_buffers...]
+    std::vector<MemRef2D> descs;
+    descs.reserve(inputArgNodes_.size() + bwdParamNodes_.size());
+    for (NodeId id : inputArgNodes_) {
+        descs.push_back(toMemRef2D(nodes_[id].value));
+    }
+    for (NodeId id : bwdParamNodes_) {
+        descs.push_back(toMemRef2D(nodes_[id].grad));
+    }
+
+    std::vector<MemRef2D *> argPtrs;
+    argPtrs.reserve(descs.size());
+    for (auto &d : descs) argPtrs.push_back(&d);
+
+    llvm::SmallVector<void *, 16> packedArgs;
+    packedArgs.reserve(argPtrs.size());
+    for (auto &ptr : argPtrs) packedArgs.push_back(&ptr);
+
+    auto err = bwdEngine_->invokePacked("_mlir_ciface_backward", packedArgs);
+    if (err) {
+        llvm::handleAllErrors(std::move(err), [](const llvm::ErrorInfoBase &e) {
+            throw std::runtime_error("Backward JIT execution failed: " + e.message());
+        });
+    }
 }
 
 void Graph::setInputShape(NodeId i, Shape s)

@@ -24,15 +24,25 @@ pred_id = pynn.linear(g, h1_relu, out=1, init=pynn.MLIRInit.He)
 
 loss_id = pynn.mse_loss(g,pred_id, target_id)
 
-g.finalizeForward(loss_id)
-g.print()
+optimizer = pynn.SGD(lr=0.02, momentum=0.9)
+params = g.param_pairs()
+
+g.finalizeForward([pred_id,loss_id])
+g.compileBackward(loss_id)
+# g.print()
 
 g.value(x_id).from_numpy(x_np)
 g.value(target_id).from_numpy(y_np)
 
-g.forward()
-
-loss_val = g.value(loss_id)
+epochs = 2500
+print("Starting training..")
+for epoch in range(epochs):
+    g.forward()
+    if epoch % 250 == 0:
+        loss_val = g.value(loss_id).to_numpy().item()
+        print(f"Epoch {epoch:4d} | loss: {loss_val:.6f}")
+    g.backward(loss_id)
+    optimizer.step(params)
 
 
 # 5. Extract Final Predictions

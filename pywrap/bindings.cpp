@@ -8,6 +8,7 @@
 #include "Tensor.h"
 #include "CPU/CPUOp.h"
 #include "CPU/Optimizer.hpp"
+#include "MLIR/Optimizer.hpp"
 
 
 int add(int i, int j) {
@@ -144,8 +145,9 @@ PYBIND11_MODULE(pynn, m) {
              py::return_value_policy::reference_internal)
         .def("param", &mlg::Graph::param, py::arg("s"), py::arg("init"), py::arg("label") = "",
              py::return_value_policy::reference_internal)
-        .def("finalizeForward", &mlg::Graph::finalizeForward, py::arg("outputNode"))
+        .def("finalizeForward", &mlg::Graph::finalizeForward, py::arg("outputNodes"))
         .def("forward", &mlg::Graph::forward)
+        .def("compileBackward", &mlg::Graph::compileBackwards, py::arg("loss"))
         .def("backward", &mlg::Graph::backward, py::arg("loss"))
         .def("set_input_shape", &mlg::Graph::setInputShape)
         .def("reshape", &mlg::Graph::reshape)
@@ -168,4 +170,12 @@ PYBIND11_MODULE(pynn, m) {
     // mlirm.def("sigmoid", &mlg::sigmoid, py::arg("g"), py::arg("x"));
     // mlirm.def("tanh", &mlg::tanh_, py::arg("g"), py::arg("x"));
     mlirm.def("mse_loss", &mlg::mseLoss, py::arg("g"), py::arg("pred"), py::arg("target"));
+    
+    // 4.3. Bind Optimizers
+    // =========================================================================
+    py::class_<mlg::Optimizer>(mlirm, "Optimizer");
+    
+    py::class_<mlg::SGD, mlg::Optimizer>(mlirm, "SGD")
+        .def(py::init<Scalar, Scalar>(), py::arg("lr"), py::arg("momentum") = 0.0)
+        .def("step", &mlg::SGD::step);
 }

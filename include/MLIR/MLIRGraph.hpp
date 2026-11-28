@@ -43,8 +43,11 @@ private:
     std::vector<NodeId> inputArgNodes_;
     std::vector<MLIRNode> nodes_;
     std::mt19937 rng_;
-    NodeId outputNode_ = -1;
+    std::vector<NodeId> outputNodes_;
     std::unique_ptr<mlir::ExecutionEngine> engine_;
+    std::unique_ptr<mlir::ExecutionEngine> bwdEngine_;
+    std::vector<NodeId> bwdParamNodes_;
+    NodeId compiledLossNode_ = -1;
 
     void initParam(Tensor &t, MLIRInit init);
     mlir::Location makeNodeLoc(NodeId id);
@@ -69,8 +72,9 @@ public:
     mlir::Value getOrAddValue(NodeId id);
     NodeId apply(std::unique_ptr<Op> op, std::vector<NodeId> in);
    
-    void finalizeForward(NodeId outputNode);
+    void finalizeForward(std::vector<NodeId> outputNodes);
     void forward();
+    void compileBackwards(NodeId loss);
     void backward(NodeId loss);
     
     void setInputShape(NodeId id, Shape s);

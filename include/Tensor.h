@@ -11,7 +11,7 @@
 
 
 
-using Scalar = double; // switch to float later, keep double for gradcheck
+using Scalar = float; // switch to float later, keep double for gradcheck
 
 struct Shape {
   size_t r = 0, c = 0;
